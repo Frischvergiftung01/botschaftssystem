@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flächen-Simulator — Königsbau</title>
+<link rel="stylesheet" href="/schrift/schrift.css">
+<style>
+  :root{--grund:#07090d;--leise:#7b8496;--rahmen:#1d2837;--kalib:#2ad4ff}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--grund);color:#e8ecf3;
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;flex-wrap:wrap;gap:16px;align-items:baseline;padding:14px 18px;border-bottom:1px solid #141b26}
+  h1{font-size:1rem;margin:0;font-weight:600}
+  .zahlen{color:var(--leise);font-size:.85rem;display:flex;gap:14px;flex-wrap:wrap}
+  .zahlen b{color:#e8ecf3;font-weight:600;font-variant-numeric:tabular-nums}
+  label{color:var(--leise);font-size:.85rem;display:flex;gap:6px;align-items:center}
+  .buehne{position:relative;width:100%;margin:0 auto;background:#05070a}
+  .flaeche{position:absolute;border:1px solid var(--rahmen)}
+  .flaeche.kalibrierung{border-color:var(--kalib)}
+  /* Der innere Kasten ist immer das liegende Band (Breite x 44 px). Bei den
+     Säulen wird genau dieser Kasten um 90 Grad gedreht - dieselbe Geometrie wie
+     im Advanced Output, nur eben im Browser. */
+  .band{position:absolute;left:50%;top:50%;overflow:hidden}
+  .band span{position:absolute;white-space:nowrap;color:#fff;
+    font-family:Oswald,"Arial Narrow",sans-serif;line-height:1;
+    transition:opacity .35s linear;opacity:0}
+  .fuss{color:var(--leise);font-size:.8rem;padding:10px 18px 24px;line-height:1.5}
+</style>
+</head>
+<body>
+<header>
+  <h1>Flächen-Simulator</h1>
+  <div class="zahlen">
+    <span>belegt <b id="belegt">0</b>/33</span>
+    <span>freigegeben <b id="freigegeben">0</b></span>
+    <span>Standzeit <b id="standzeit">–</b> s</span>
+    <span id="verbindung">verbunden</span>
+  </div>
+  <label><input type="checkbox" id="rahmen" checked> Flächenrahmen zeigen</label>
+</header>
+
+<div class="buehne" id="buehne"></div>
+
+<p class="fuss">
+  Dieselben Daten, die später die Bridge an Resolume schickt: Text, Schrifthöhe und Y-Versatz je Fläche.
+  Die Blende läuft mit 0,35 s wie der <code>Smooth</code>-Knoten im Patch.
+</p>
+
+<script>
+const CANVAS_B = 7680, CANVAS_H = 1200, BANDHOEHE = 44, VERSAL_ANTEIL = 0.81, RAND = 2;
+const buehne = document.getElementById('buehne');
+const el = id => document.getElementById(id);
+let flaechen = [], kacheln = new Map(), skala = 1;
+
+start();
+
+async function start () {
+  flaechen = await (await fetch('/api/flaechen')).json();
+  aufbauen();
+  window.addEventListener('resize', () => { massnehmen(); });
+  el('rahmen').addEventListener('change', e =>
+    document.querySelectorAll('.flaeche').forEach(k => k.classList.toggle('kalibrierung', e.target.checked)));
+  schleife();
+}
+
+// Die Kacheln sitzen an den echten Fassadenkoordinaten aus dem Screen-Setup —
+// stehende Streifen für die Säulen, liegende für die Stirnbänder.
+function aufbauen () {
+  buehne.innerHTML = '';
+  for (const f of flaechen) {
+    const k = document.createElement('div');
+    k.className = 'flaeche kalibrierung' + (f.gruppe === 'stirn' ? ' mittig' : '');
+    k.dataset.nr = f.nr;
+    k.title = f.nr + ' ' + f.name;
+    const band = document.createElement('div');
+    band.className = 'band';
+    const s = document.createElement('span');
+    band.appendChild(s);
+    k.appendChild(band);
+    buehne.appendChild(k);
+    kacheln.set(f.nr, { kachel: k, band, span: s, flaeche: f });
+  }
+  massnehmen();
+}
+
+function massnehmen () {
+  skala = buehne.clientWidth / CANVAS_B;
+  buehne.style.height = (CANVAS_H * skala) + 'px';
+  for (const { kachel, band, flaeche } of kacheln.values()) {
+    const gedreht = flaeche.fassade.gedreht;
+    kachel.style.left = (flaeche.fassade.x * skala) + 'px';
+    kachel.style.top = (flaeche.fassade.y * skala) + 'px';
+    kachel.style.width = ((gedreht ? BANDHOEHE : flaeche.breite) * skala) + 'px';
+    kachel.style.height = ((gedreht ? flaeche.breite : BANDHOEHE) * skala) + 'px';
+    band.style.width = (flaeche.breite * skala) + 'px';
+    band.style.height = (BANDHOEHE * skala) + 'px';
+    // im Uhrzeigersinn gedreht: die linke Textkante liegt oben an der Säule
+    band.style.transform = 'translate(-50%, -50%)' + (gedreht ? ' rotate(90deg)' : '');
+  }
+  zeichnen(letzteDaten);
+}
+
+let letzteDaten = null;
+async function schleife () {
+  try {
+    const d = await (await fetch('/api/anzeige')).json();
+    letzteDaten = d;
+    zeichnen(d);
+    el('verbindung').textContent = 'verbunden';
+  } catch (e) {
+    el('verbindung').textContent = 'keine Verbindung';
+  }
+  setTimeout(schleife, 500);
+}
+
+function zeichnen (d) {
+  if (!d) return;
+  let belegt = 0;
+  for (const f of d.flaechen) {
+    const eintrag = kacheln.get(f.nr);
+    if (!eintrag) continue;
+    const { span, flaeche } = eintrag;
+    if (f.text) {
+      belegt++;
+      if (span.textContent !== f.text) span.textContent = f.text;
+      // Schriftgröße aus der Versalhöhe, die das Backend gemessen hat
+      const em = (f.versalhoehe || 30) / VERSAL_ANTEIL;         // Geviertgröße in Canvas-Pixeln
+      span.style.fontSize = (em * skala) + 'px';
+      // Senkrechte Lage: Grundlinie dorthin, wo sie der Patch hinsetzt, korrigiert
+      // um den mitgelieferten Y-Versatz. 0,952 em ist der Abstand von der Oberkante
+      // des Zeilenkastens (line-height 1) bis zur Grundlinie bei dieser Schrift.
+      const grundlinieAbMitte = 0.452 * em - (f.yVersatz || 0);
+      const oben = BANDHOEHE / 2 + grundlinieAbMitte - 0.952 * em;
+      span.style.top = (oben * skala) + 'px';
+      if (flaeche.gruppe === 'stirn') {
+        span.style.left = '50%';
+        span.style.transform = 'translateX(-50%)';
+      } else {
+        span.style.left = (RAND * skala) + 'px';
+        span.style.transform = 'none';
+      }
+      span.style.opacity = 1;
+    } else {
+      span.style.opacity = 0;
+    }
+  }
+  el('belegt').textContent = belegt;
+}
+
+setInterval(async () => {
+  try {
+    const k = await (await fetch('/api/kennzahlen')).json();
+    el('freigegeben').textContent = k.botschaften.freigegeben || 0;
+    el('standzeit').textContent = k.standzeit;
+  } catch (e) {}
+}, 3000);
+</script>
+</body>
+</html>

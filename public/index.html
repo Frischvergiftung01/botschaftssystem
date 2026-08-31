@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Deine Botschaft am Königsbau</title>
+<link rel="stylesheet" href="/schrift/schrift.css">
+<style>
+  :root{
+    --grund:#0d0f14; --feld:#171b23; --rand:#2a3040; --text:#f2f4f8;
+    --leise:#98a1b3; --gold:#ffcf6b; --warn:#ff9a6b;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--grund);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+  body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;
+    padding:24px 20px calc(24px + env(safe-area-inset-bottom));gap:18px}
+  header{width:100%;max-width:520px;text-align:center;margin-top:8px}
+  h1{font-size:1.5rem;line-height:1.25;margin:0 0 6px;font-weight:650}
+  .unterzeile{color:var(--leise);font-size:.95rem;margin:0}
+  form{width:100%;max-width:520px;display:flex;flex-direction:column;gap:14px}
+  label{font-size:.9rem;color:var(--leise);display:block;margin-bottom:6px}
+  label .neben{opacity:.75}
+  textarea,input{width:100%;background:var(--feld);color:var(--text);border:1px solid var(--rand);
+    border-radius:14px;padding:14px;font:inherit;font-size:1.05rem;resize:none}
+  textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
+  .spielregeln{background:#12161e;border:1px solid var(--rand);border-radius:14px;
+    padding:12px 14px;font-size:.88rem;line-height:1.5;color:var(--leise)}
+  .spielregeln b{color:var(--text);font-weight:600}
+  .zaehler{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    font-size:.85rem;color:var(--leise);margin-top:8px}
+  .zaehler .zahl{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .zaehler.eng #passt{color:var(--warn)}
+  .zaehler.eng .zahl{color:var(--warn)}
+  button{background:var(--gold);color:#1a1206;border:0;border-radius:14px;padding:15px;
+    font:inherit;font-size:1.05rem;font-weight:650;cursor:pointer}
+  button:disabled{opacity:.45;cursor:default}
+  .fehler{color:var(--warn);font-size:.9rem;min-height:1.2em;margin:0}
+  footer{max-width:520px;color:#6b748b;font-size:.78rem;text-align:center;line-height:1.5;margin-top:auto}
+  .vorschau{border:1px solid var(--rand);border-radius:14px;padding:10px 12px;background:#0a0c11}
+  .vorschau .titel{font-size:.75rem;color:var(--leise);margin-bottom:8px}
+  .vorschau .band{display:block;overflow:hidden;white-space:nowrap;color:#fff;line-height:1;
+    font-family:Oswald,"Arial Narrow",system-ui,sans-serif;position:relative}
+</style>
+</head>
+<body>
+<header>
+  <h1>Schick deine Botschaft an den Königsbau</h1>
+  <p class="unterzeile">Sie erscheint im Laufe des Abends auf der Fassade.</p>
+</header>
+
+<form id="formular" autocomplete="off">
+  <div class="spielregeln">
+    Grüße, Glückwünsche, Liebeserklärungen — alles gern. Jede Botschaft wird vorher gelesen;
+    Beleidigendes, Werbung und Politisches zeigen wir nicht.<br>
+    <b>Kurz ist am schönsten:</b> bis etwa 35 Zeichen passt eine Botschaft auf alle 33 Flächen.
+    Längere passen nur auf die wenigen breiten und erscheinen deshalb seltener.
+  </div>
+
+  <div>
+    <label for="text">Deine Botschaft</label>
+    <textarea id="text" name="text" rows="3" maxlength="120" enterkeyhint="done"
+      placeholder="Zum Beispiel: Grüße an alle daheim"></textarea>
+    <div class="zaehler" id="zaehler">
+      <span id="passt">passt auf alle 33 Flächen</span>
+      <span class="zahl"><span id="anzahl">0</span>/120</span>
+    </div>
+  </div>
+
+  <div id="namensfeld">
+    <label for="name">Dein Vorname <span class="neben">— optional</span></label>
+    <input id="name" name="name" maxlength="15" placeholder="Lena">
+  </div>
+
+  <div class="vorschau">
+    <div class="titel" id="vorschauTitel">So sieht das auf der Fassade aus</div>
+    <div class="band" id="vorschauBand">&nbsp;</div>
+  </div>
+
+  <p class="fehler" id="fehler"></p>
+  <button id="senden" type="submit">Botschaft abschicken</button>
+</form>
+
+<footer>
+  Keine Anmeldung, keine Konten — wir speichern nur den Text und, wenn du ihn angibst, deinen Vornamen.
+</footer>
+
+<script>
+// Die Flächenbreiten holen wir uns einmal vom Server. Damit kann die Seite ohne
+// weitere Anfrage ausrechnen, auf wie vielen Flächen eine Botschaft landen kann —
+// gemessen mit derselben Schrift, die auch auf dem Gebäude steht.
+const ERSATZBREITEN = [2280,1680,1680,785,785,488,488,488,488,
+  437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437,437];
+let breiten = ERSATZBREITEN;
+
+const SAEULE_BREITE = 437, BAND_HOEHE = 44, RAND = 2;
+const MAX_VERSALHOEHE = 40, MIN_VERSALHOEHE = 22, VERSAL_ANTEIL = 0.81;
+
+const text = document.getElementById('text');
+const name = document.getElementById('name');
+const anzahl = document.getElementById('anzahl');
+const zaehler = document.getElementById('zaehler');
+const passtText = document.getElementById('passt');
+const fehler = document.getElementById('fehler');
+const senden = document.getElementById('senden');
+const vorschauBand = document.getElementById('vorschauBand');
+const vorschauTitel = document.getElementById('vorschauTitel');
+const messer = document.createElement('canvas').getContext('2d');
+
+// Gerätekennung nur für die Spam-Sperre — bleibt auf dem Gerät.
+let geraet = localStorage.getItem('geraet');
+if (!geraet) { geraet = crypto.randomUUID(); localStorage.setItem('geraet', geraet); }
+
+fetch('/api/flaechen').then(a => a.json())
+  .then(f => { breiten = f.map(x => x.breite); aktualisieren(); })
+  .catch(() => {});
+
+function vollerText () {
+  const t = text.value.trim(), n = name.value.trim();
+  return n ? `${t} — ${n}` : t;
+}
+
+/** Welche der 33 Flächen kommen für diesen Text in Frage? */
+function passendeFlaechen (voll) {
+  if (!voll) return breiten.slice();
+  messer.font = '100px Oswald, "Arial Narrow", sans-serif';
+  const breite100 = messer.measureText(voll).width || 1;
+  return breiten.filter(b => {
+    const em = Math.min(100 * ((b - 2 * RAND) / breite100), MAX_VERSALHOEHE / VERSAL_ANTEIL);
+    return em * VERSAL_ANTEIL >= MIN_VERSALHOEHE;
+  });
+}
+
+function aktualisieren () {
+  const voll = vollerText();
+  anzahl.textContent = text.value.length;
+  const passend = passendeFlaechen(voll);
+  const k = passend.length;
+  const alle = breiten.length;
+  zaehler.classList.toggle('eng', k < alle);
+  passtText.textContent = k === alle
+    ? `passt auf alle ${alle} Flächen`
+    : (k === 0 ? 'zu lang für jede Fläche' : `passt auf ${k} von ${alle} Flächen`);
+  senden.disabled = text.value.trim().length < 2;
+  // Vorschau auf der schmalsten Fläche, die noch passt — dort landet die Botschaft
+  // am ehesten, weil es von den schmalen die meisten gibt.
+  vorschau(voll, k > 0 ? Math.min(...passend) : Math.max(...breiten));
+}
+
+// Vorschau in echter Projektionsoptik. Der Kasten zeigt immer einen säulenbreiten
+// Ausschnitt (437 px) der Fläche, auf der die Botschaft landen würde. So bleiben die
+// Buchstaben ablesbar groß, auch wenn sie auf einer der breiten Stirnflächen erscheint —
+// was rechts nicht mehr hineinpasst, läuft weich aus. Gemessen wird mit der Schrift,
+// die auch auf dem Gebäude steht.
+function vorschau (voll, flaechenBreite = SAEULE_BREITE) {
+  vorschauBand.textContent = voll || ' ';
+  const kasten = vorschauBand.clientWidth || 300;
+  const skala = kasten / SAEULE_BREITE;
+  vorschauBand.style.height = (BAND_HOEHE * skala) + 'px';
+  messer.font = '100px Oswald, "Arial Narrow", sans-serif';
+  const breite100 = messer.measureText(voll || ' ').width || 1;
+  const em = Math.min(100 * ((flaechenBreite - 2 * RAND) / breite100), MAX_VERSALHOEHE / VERSAL_ANTEIL);
+  vorschauBand.style.fontSize = (em * skala) + 'px';
+  // Grundlinie so setzen, dass der Text im 44-px-Band sitzt wie auf der Fassade
+  vorschauBand.style.paddingTop = Math.max(0, (BAND_HOEHE / 2 + 0.452 * em - 0.952 * em) * skala) + 'px';
+  const laeuftUeber = (breite100 / 100) * em > SAEULE_BREITE;
+  vorschauBand.style.webkitMaskImage = vorschauBand.style.maskImage = laeuftUeber
+    ? 'linear-gradient(to right, #000 80%, transparent 100%)' : 'none';
+  vorschauTitel.textContent = laeuftUeber
+    ? 'So sieht das auf der Fassade aus — Ausschnitt, auf einer breiten Fläche steht sie ganz'
+    : 'So sieht das auf der Fassade aus';
+}
+
+if (document.fonts) document.fonts.ready.then(aktualisieren);
+window.addEventListener('resize', aktualisieren);
+text.addEventListener('input', aktualisieren);
+name.addEventListener('input', aktualisieren);
+aktualisieren();
+
+document.getElementById('formular').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  senden.disabled = true; fehler.textContent = '';
+  try {
+    const antwort = await fetch('/api/botschaft', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: text.value, name: name.value, geraet })
+    });
+    const daten = await antwort.json();
+    if (!antwort.ok) { fehler.textContent = daten.fehler || 'Das hat nicht geklappt.'; senden.disabled = false; return; }
+    localStorage.setItem('token', daten.token);
+    location.href = '/status?t=' + encodeURIComponent(daten.token);
+  } catch (err) {
+    fehler.textContent = 'Keine Verbindung. Noch einmal versuchen?';
+    senden.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
