@@ -1,17 +1,23 @@
-# In Coolify als "Docker Compose"-Anwendung hinterlegen.
-# Kein Port-Mapping nach aussen und kein eigener Reverse Proxy - das macht Coolify.
+# In Coolify als Ressource "Private Repository (with GitHub App)" anlegen,
+# Build Pack "Docker Compose", Pfad: /docker-compose.yml
+#
+# Kein Port-Mapping nach aussen und kein eigener Reverse Proxy - beides macht
+# Coolify. Die Umgebung steht bewusst als Zuordnung (NAME: Wert) und nicht als
+# Liste, weil Coolify ueber Listeneintraege ohne Gleichheitszeichen stolpert.
 services:
   botschaft:
     build: .
     restart: unless-stopped
     environment:
-      - PORT=3000
-      - DB_PFAD=/daten/botschaften.db
-      # Solange die Filterkette fehlt, geht alles direkt in die Anzeige:
-      - AUTO_FREIGABE=true
-      - STANDZEIT=25
-      - MAX_VERSALHOEHE=40
-      - MIN_VERSALHOEHE=22
+      PORT: 3000
+      DB_PFAD: /daten/botschaften.db
+      # Solange die Filterkette (Block 4) fehlt, geht alles direkt in die Anzeige:
+      AUTO_FREIGABE: "true"
+      STANDZEIT: 25
+      MAX_ZEICHEN: 120
+      EMPFOHLENE_ZEICHEN: 35
+      MAX_VERSALHOEHE: 40
+      MIN_VERSALHOEHE: 22
     volumes:
       - botschaft-daten:/daten
     expose:
@@ -21,6 +27,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 20s
 
 volumes:
   botschaft-daten:
