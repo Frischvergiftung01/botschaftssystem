@@ -51,7 +51,10 @@ const FAELLE = [
   ['Sieg Heil',                           'ABLEHNEN', '4.3'],
   ['Ausländer raus',                      'ABLEHNEN', '4.3'],
   ['1488',                                'ABLEHNEN', '4.3 Code'],
-  ['Ich töte dich',                       'ABLEHNEN', '4.5']
+  ['Ich töte dich',                       'ABLEHNEN', '4.5'],
+  ['4usl43nd3r r4us',                     'ABLEHNEN', '6 Leetspeak trifft Umlautschreibweise'],
+  ['t0et3 dich',                          'ABLEHNEN', '6 dito'],
+  ['A u s l ä n d e r  r a u s',          'ABLEHNEN', '6 Sperrschrift mit Umlaut']
 ];
 
 let fehler = 0;

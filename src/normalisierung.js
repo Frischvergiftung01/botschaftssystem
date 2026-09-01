@@ -34,6 +34,14 @@ function sperrschriftAufloesen (s) {
 // Leetspeak nur dort aufloesen, wo Buchstaben im Spiel sind. Eine reine
 // Zahlengruppe bleibt unangetastet — sonst wuerde aus der Jahreszahl 1888
 // ein "ibi" und aus dem Code 88 ein "bb", und die Zahlenpruefung liefe ins Leere.
+// "auslaender" und "Ausländer" muessen dieselbe Zeichenfolge ergeben: die
+// Umlaute sind schon zu a/o/u geworden, hier folgt die ausgeschriebene
+// Variante nach. Laeuft zweimal — einmal auf der Basisfassung und noch einmal
+// nach dem Leetspeak, weil aus "4usl43nd3r" erst dort ein "auslaender" wird.
+function umlautSchreibweise (s) {
+  return s.replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u');
+}
+
 function leetAufloesen (s) {
   return s.replace(/[^\s]+/g, wort =>
     /[a-z]/.test(wort) ? wort.replace(/[1!|34@05$7+98]/g, z => LEET[z] || z) : wort);
@@ -48,16 +56,12 @@ function wiederholungenKuerzen (s) {
 function normalisieren (roh) {
   const basis = ohneDiakritika(String(roh || '').toLowerCase())
     .replace(/ß/g, 'ss')
-    // "auslaender" und "Ausländer" muessen dieselbe Zeichenfolge ergeben:
-    // die Umlaute sind oben schon zu a/o/u geworden, hier folgt die
-    // ausgeschriebene Variante nach. Gilt fuer Botschaft und Wortliste
-    // gleichermassen, deshalb kann die Wortliste natuerlich geschrieben werden.
     .replace(/ae/g, 'a').replace(/oe/g, 'o').replace(/ue/g, 'u')
     .replace(/\s+/g, ' ')
     .trim();
 
   const entzerrt = sperrschriftAufloesen(trennzeichenAufloesen(basis));
-  const geglaettet = wiederholungenKuerzen(leetAufloesen(entzerrt));
+  const geglaettet = wiederholungenKuerzen(umlautSchreibweise(leetAufloesen(entzerrt)));
 
   const woerter = geglaettet.split(/[^a-z0-9]+/).filter(Boolean);
   return {
