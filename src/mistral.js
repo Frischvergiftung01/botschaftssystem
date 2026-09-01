@@ -21,6 +21,12 @@ const ENDPUNKT = 'https://api.mistral.ai/v1/chat/completions';
 
 let laufend = 0;
 const zaehler = { aufrufe: 0, frei: 0, pruefen: 0, ablehnen: 0, timeout: 0, fehler: 0, ueberlastet: 0, msGesamt: 0 };
+// Der letzte Fehlergrund gehoert in die Kennzahlen: am Veranstaltungsabend
+// muss ohne Serverzugang erkennbar sein, WARUM die Stufe nicht antwortet -
+// abgelaufener Schluessel, leeres Guthaben und Rate-Limit brauchen ganz
+// verschiedene Handgriffe. Die Antwort der Gegenstelle wird gekuerzt
+// mitgenommen; ein Schluessel steht dort nicht drin.
+let letzterFehler = null;
 
 const aktiv = () => Boolean(cfg.mistralSchluessel);
 
@@ -63,6 +69,8 @@ async function bewerten (text, name = '') {
 
     if (!antwort.ok) {
       zaehler.fehler++;
+      const text = await antwort.text().catch(() => '');
+      letzterFehler = { zeit: Date.now(), grund: `http ${antwort.status}`, antwort: text.slice(0, 200) };
       return { urteil: 'PRUEFEN', stufe: '1b', grund: `http ${antwort.status}`, ms };
     }
 
@@ -76,11 +84,13 @@ async function bewerten (text, name = '') {
 
     // Unverständliche Antwort ist kein Freibrief.
     zaehler.fehler++;
+    letzterFehler = { zeit: Date.now(), grund: 'unklare Antwort', antwort: wort.slice(0, 40) };
     return { urteil: 'PRUEFEN', stufe: '1b', grund: 'unklare Antwort: ' + wort.slice(0, 20), ms };
   } catch (e) {
     const ms = Date.now() - start;
     const timeout = e.name === 'AbortError';
     timeout ? zaehler.timeout++ : zaehler.fehler++;
+    if (!timeout) letzterFehler = { zeit: Date.now(), grund: 'ausnahme', antwort: String(e.message).slice(0, 200) };
     return { urteil: 'PRUEFEN', stufe: '1b', grund: timeout ? 'zeitlimit' : String(e.message).slice(0, 60), ms };
   } finally {
     clearTimeout(wecker);
@@ -90,6 +100,7 @@ async function bewerten (text, name = '') {
 
 const kennzahlen = () => ({
   ...zaehler,
+  letzterFehler,
   laufend,
   msSchnitt: zaehler.aufrufe ? Math.round(zaehler.msGesamt / zaehler.aufrufe) : null
 });

@@ -22,7 +22,10 @@ module.exports = {
 
   // Stufe 1b — Sprachmodell. Ohne Schluessel ist sie stillgelegt und die
   // Kette endet nach 1a. Der Schluessel steht in Coolify, nie im Repository.
-  mistralSchluessel: process.env.MISTRAL_API_KEY || '',
+  // Leerzeichen, Zeilenumbrueche und mitkopierte Anfuehrungszeichen abschneiden:
+  // beim Einfuegen in Coolify rutschen die regelmaessig mit, und die
+  // Gegenstelle antwortet dann mit einem nackten 401.
+  mistralSchluessel: (process.env.MISTRAL_API_KEY || '').trim().replace(/^["']|["']$/g, ''),
   mistralModell: process.env.MISTRAL_MODELL || 'mistral-small-2603',
   mistralZeitlimitMs: Number(process.env.MISTRAL_ZEITLIMIT_MS || 3000),
   // So viele Aufrufe gleichzeitig. Wird nach der Messung gegen das echte
