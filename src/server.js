@@ -11,6 +11,7 @@ const cfg = require('./config');
 const { FLAECHEN } = require('./flaechen');
 const { abfragen } = require('./db');
 const { groesseFuer, passendeFlaechen } = require('./text');
+const filter = require('./filter');
 const scheduler = require('./scheduler');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
@@ -25,6 +26,13 @@ fastify.post('/api/botschaft', async (req, reply) => {
   if (text.length > cfg.maxZeichenText) return reply.code(400).send({ fehler: `Höchstens ${cfg.maxZeichenText} Zeichen.` });
   if (name.length > cfg.maxZeichenName) return reply.code(400).send({ fehler: `Der Name darf höchstens ${cfg.maxZeichenName} Zeichen haben.` });
 
+  // Zeichen, die die Schrift nicht kennt, kann die Fassade nicht zeigen.
+  // Das ist keine Moderationsfrage — hier darf der Grund genannt werden.
+  const fremd = filter.nichtDarstellbar(text + name);
+  if (fremd.length) {
+    return reply.code(400).send({ fehler: `Diese Zeichen können wir auf der Fassade nicht darstellen: ${fremd.join(' ')}` });
+  }
+
   // Spam-Sperre je Gerät. Die Kennung kommt vom Browser und wird nur gehasht
   // gespeichert — wir wollen wissen "schon wieder dasselbe Gerät", nicht "wer".
   const geraet = hash(String(req.body?.geraet ?? req.ip));
@@ -36,12 +44,28 @@ fastify.post('/api/botschaft', async (req, reply) => {
 
   const token = crypto.randomBytes(9).toString('base64url');
   const jetzt = Date.now();
-  // Solange die Filterkette (Block 4) fehlt, geht alles direkt in die Anzeige.
-  const status = cfg.autoFreigabe ? 'freigegeben' : 'neu';
+
+  // Filterkette Stufe 1a. ABLEHNEN und PRUEFEN entscheidet sie allein;
+  // ueber ein FREI entscheidet spaeter zusaetzlich Stufe 1b (Sprachmodell).
+  const pruefung = filter.pruefen(text, name);
+  const status = pruefung.urteil === 'ABLEHNEN' ? 'abgelehnt'
+    : pruefung.urteil === 'FREI' && cfg.autoFreigabe ? 'freigegeben'
+      : 'neu';
+
   const info = abfragen.einfuegen.run({
     text, name: name || null, status, token, geraet,
-    erstellt_am: jetzt, entschieden_am: status === 'freigegeben' ? jetzt : null
+    filter: JSON.stringify(pruefung),
+    erstellt_am: jetzt,
+    entschieden_am: status === 'neu' ? null : jetzt
   });
+
+  // Abgelehntes wird protokolliert (Richtlinie 9), dem Absender aber als
+  // Fehler im selben Fenster gezeigt — sein Text bleibt stehen und er kann
+  // ihn umschreiben.
+  if (status === 'abgelehnt') {
+    req.log.info({ id: info.lastInsertRowid, gruende: pruefung.gruende }, 'Botschaft abgelehnt (Stufe 1a)');
+    return reply.code(422).send({ fehler: cfg.textAblehnung });
+  }
 
   const voll = name ? `${text} — ${name}` : text;
   const passend = passendeFlaechen(voll, FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe);

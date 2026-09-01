@@ -42,8 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_anzeigen_flaeche   ON anzeigen(flaeche, start);
 `);
 
 const abfragen = {
-  einfuegen: db.prepare(`INSERT INTO botschaften (text, name, status, token, geraet, erstellt_am, entschieden_am)
-                         VALUES (@text, @name, @status, @token, @geraet, @erstellt_am, @entschieden_am)`),
+  einfuegen: db.prepare(`INSERT INTO botschaften (text, name, status, filter, token, geraet, erstellt_am, entschieden_am)
+                         VALUES (@text, @name, @status, @filter, @token, @geraet, @erstellt_am, @entschieden_am)`),
   perToken: db.prepare('SELECT * FROM botschaften WHERE token = ?'),
   perId: db.prepare('SELECT * FROM botschaften WHERE id = ?'),
   letzteVomGeraet: db.prepare('SELECT erstellt_am FROM botschaften WHERE geraet = ? ORDER BY erstellt_am DESC LIMIT 1'),

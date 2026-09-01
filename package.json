@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "seed": "node werkzeuge/seed.js",
-    "test": "node werkzeuge/durchstich-test.js"
+    "test": "node werkzeuge/durchstich-test.js && node werkzeuge/filter-test.js"
   },
   "engines": {
     "node": ">=20"

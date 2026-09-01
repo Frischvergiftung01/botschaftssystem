@@ -13,8 +13,17 @@ module.exports = {
   nameErlaubt: process.env.NAME_ERLAUBT !== 'false',
   sperreProGeraetSekunden: Number(process.env.SPERRE_SEKUNDEN || 30),
 
-  // Filterkette (Block 4). Solange sie fehlt, wandert alles direkt in die Anzeige.
+  // Filterkette (Block 4).
+  // Stufe 1a (Wortliste, Regeln) laeuft immer. autoFreigabe entscheidet nur,
+  // was mit einem sauberen FREI passiert: true = direkt in die Anzeige,
+  // false = trotzdem erst durch die Moderation. Ein PRUEFEN geht in jedem
+  // Fall in die Queue, ein ABLEHNEN in jedem Fall zurueck.
   autoFreigabe: process.env.AUTO_FREIGABE !== 'false',
+
+  // Wortlaut gegenueber dem Absender. Ohne Grund - eine Begruendung waere die
+  // Anleitung fuer den naechsten Versuch (Filterrichtlinie, Abschnitt 2 und 7).
+  textAblehnung: process.env.TEXT_ABLEHNUNG
+    || 'Diese Botschaft können wir leider nicht zeigen. Versuch es gern mit anderen Worten.',
 
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),

@@ -34,11 +34,34 @@ src/server.js      Fastify: nimmt Botschaften an, liefert Status und Anzeigezust
 src/scheduler.js   teilt Botschaften auf die 33 Flächen zu, versetzter Wechsel
 src/text.js        misst Text in echten Schriftmaßen -> größte Größe, die passt
 src/flaechen.js    die 33 Flächen: Maße, Lage auf der Canvas, Lage an der Fassade
+src/filter.js      Filterkette Stufe 1a: entscheidet FREI / PRUEFEN / ABLEHNEN
+src/normalisierung.js  glaettet Leetspeak, Sperrschrift, Trennzeichen, Wiederholungen
+src/wortliste.js   die drei Raenge hart / weich / Ausnahmen — nicht weitergeben
 src/db.js          SQLite-Schema
 src/config.js      alle Stellschrauben, per Umgebungsvariable überschreibbar
 public/            die drei Seiten, ohne Framework und ohne Build
-werkzeuge/         Seed und Durchstich-Test
+werkzeuge/         Seed, Durchstich-Test und Filter-Test
 ```
+
+## Filterkette, Stufe 1a
+
+Grundlage ist `Filterrichtlinie.md` im Konzeptionsordner. `src/filter.js` liefert je Botschaft
+`FREI`, `PRUEFEN` oder `ABLEHNEN`:
+
+- **ABLEHNEN** — Adressen, Mail, Telefon, Handles und die harte Wortliste. Der Absender bekommt
+  eine freundliche Absage **ohne Grund** (sonst ist die Ablehnung eine Anleitung für den nächsten
+  Versuch); die Botschaft wird mitsamt Begründung protokolliert.
+- **PRUEFEN** — weiche Wortliste und Spamverdacht. Geht in die Moderationsqueue, auch wenn
+  `AUTO_FREIGABE=true` steht.
+- **FREI** — geht bei `AUTO_FREIGABE=true` direkt in die Anzeige, später zusätzlich durch Stufe 1b.
+
+Vor dem Abgleich wird normalisiert — Umlaute, ß, Leetspeak, Sperrschrift, Trennzeichen,
+Wiederholungen. Die Wortliste läuft durch dieselbe Normalisierung, deshalb darf sie natürlich
+geschrieben werden. `npm test` prüft 35 Fälle aus den Beispieltabellen der Richtlinie; wer die
+Richtlinie ändert, ändert `werkzeuge/filter-test.js` mit.
+
+Zeichen, die die Schrift nicht kennt (Emoji, fremde Alphabete), werden getrennt abgewiesen —
+mit Begründung, denn das ist keine Moderationsfrage, sondern eine Anzeigefrage.
 
 ## Die wichtigste Rechnung: passt der Text auf die Fläche?
 
@@ -61,10 +84,8 @@ rund 29 px. Der Test in `werkzeuge/durchstich-test.js` prüft das bei jedem Lauf
 
 ## Was als Nächstes drankommt
 
-- **Block 3:** Repository auf GitHub, Coolify-Projekt, Subdomain — dann ist jeder Zwischenstand
-  unter einer echten Adresse anschaubar
-- **Block 4:** Filterkette (Wortliste mit Normalisierung, dann Mistral). Solange sie fehlt, steht
-  `AUTO_FREIGABE=true` und jede Botschaft geht direkt in die Anzeige
+- **Block 4b:** semantische Stufe (Mistral) hinter der Wortliste, nebenläufig, harter
+  3-Sekunden-Timeout, bei Ausfall Rückfall in die Moderationsqueue statt Verwerfen
 - **Block 5:** Moderationsoberfläche und die feine Scheduler-Logik
 - **Block 6:** Bridge auf dem Medien-PC — der Simulator wird gegen Arena getauscht, beide bleiben
   umschaltbar
