@@ -78,6 +78,14 @@ Drei Eigenschaften sind wichtiger als die Trefferquote:
   unverständliche Antwort — alles endet in `PRUEFEN`.
 - **Begrenzte Gleichzeitigkeit** (`MISTRAL_PARALLEL`). Wer keinen Platz bekommt, wartet nicht,
   sondern geht sofort in die Moderation.
+- **Wiederholung bei 429 und 5xx**, bis zu dreimal, aber nur solange das Zeitbudget reicht — die
+  Frist gilt für alle Versuche zusammen. Mistral antwortet unter Last mit `503 please retry`; im
+  ersten Livetest war das jeder zweite Aufruf. Bei 401 (Schlüssel) und 402 (Guthaben) wird nicht
+  wiederholt, das geht nicht vorbei.
+
+`/api/kennzahlen` zeigt unter `stufe1b` die Zähler und den **letzten Fehlergrund samt Antwort der
+Gegenstelle**. Das ist die Anzeige für den Veranstaltungsabend: abgelaufener Schlüssel, leeres
+Guthaben und Überlast brauchen ganz verschiedene Handgriffe.
 
 Ohne `MISTRAL_API_KEY` ist die Stufe stillgelegt und die Kette endet nach 1a.
 
