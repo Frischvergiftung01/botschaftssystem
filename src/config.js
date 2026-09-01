@@ -20,6 +20,15 @@ module.exports = {
   // Fall in die Queue, ein ABLEHNEN in jedem Fall zurueck.
   autoFreigabe: process.env.AUTO_FREIGABE !== 'false',
 
+  // Stufe 1b — Sprachmodell. Ohne Schluessel ist sie stillgelegt und die
+  // Kette endet nach 1a. Der Schluessel steht in Coolify, nie im Repository.
+  mistralSchluessel: process.env.MISTRAL_API_KEY || '',
+  mistralModell: process.env.MISTRAL_MODELL || 'mistral-small-2603',
+  mistralZeitlimitMs: Number(process.env.MISTRAL_ZEITLIMIT_MS || 3000),
+  // So viele Aufrufe gleichzeitig. Wird nach der Messung gegen das echte
+  // Rate-Limit gesetzt — zu hoch bringt 429er statt Tempo.
+  mistralParallel: Number(process.env.MISTRAL_PARALLEL || 4),
+
   // Wortlaut gegenueber dem Absender. Ohne Grund - eine Begruendung waere die
   // Anleitung fuer den naechsten Versuch (Filterrichtlinie, Abschnitt 2 und 7).
   textAblehnung: process.env.TEXT_ABLEHNUNG

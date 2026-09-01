@@ -35,6 +35,8 @@ src/scheduler.js   teilt Botschaften auf die 33 Flächen zu, versetzter Wechsel
 src/text.js        misst Text in echten Schriftmaßen -> größte Größe, die passt
 src/flaechen.js    die 33 Flächen: Maße, Lage auf der Canvas, Lage an der Fassade
 src/filter.js      Filterkette Stufe 1a: entscheidet FREI / PRUEFEN / ABLEHNEN
+src/mistral.js     Stufe 1b: Sprachmodell, hartes Zeitlimit, Ausfall -> Queue
+src/richtlinie.js  der Auftrag an das Modell - verdichtete Filterrichtlinie
 src/normalisierung.js  glaettet Leetspeak, Sperrschrift, Trennzeichen, Wiederholungen
 src/wortliste.js   die drei Raenge hart / weich / Ausnahmen — nicht weitergeben
 src/db.js          SQLite-Schema
@@ -63,6 +65,27 @@ Richtlinie ändert, ändert `werkzeuge/filter-test.js` mit.
 Zeichen, die die Schrift nicht kennt (Emoji, fremde Alphabete), werden getrennt abgewiesen —
 mit Begründung, denn das ist keine Moderationsfrage, sondern eine Anzeigefrage.
 
+## Filterkette, Stufe 1b
+
+`src/mistral.js` schickt alles, was 1a nicht schon abgelehnt hat, an ein Sprachmodell — mit dem
+Prompt aus `src/richtlinie.js`, der verdichteten Fassung der Richtlinie. Es zählt immer das
+**strengere** der beiden Urteile: 1b darf verschärfen, freigeben darf nur ein Mensch.
+
+Drei Eigenschaften sind wichtiger als die Trefferquote:
+
+- **Hartes Zeitlimit** (`MISTRAL_ZEITLIMIT_MS`, Vorgabe 3000). Der Absender wartet darauf.
+- **Ausfall heißt Queue, nicht verwerfen.** Zeitüberschreitung, Fehler, leeres Guthaben,
+  unverständliche Antwort — alles endet in `PRUEFEN`.
+- **Begrenzte Gleichzeitigkeit** (`MISTRAL_PARALLEL`). Wer keinen Platz bekommt, wartet nicht,
+  sondern geht sofort in die Moderation.
+
+Ohne `MISTRAL_API_KEY` ist die Stufe stillgelegt und die Kette endet nach 1a.
+
+`npm run messung` fährt Latenz, Rate-Limit und Trefferquote gegen das echte Konto und schlägt
+Werte für `MISTRAL_PARALLEL` und `MISTRAL_ZEITLIMIT_MS` vor. Die 20 Fälle dort sind solche, an
+denen 1a blind ist — Ironie, Anspielung, verpackte Politik, vollständige Namen. Was dort danebengeht,
+gehört in den Prompt, nicht in die Wortliste.
+
 ## Die wichtigste Rechnung: passt der Text auf die Fläche?
 
 Zeichenzählen taugt nicht — `WAHNSINN, WAS FÜR EIN ABEND` läuft über, wo gleich viele
@@ -84,8 +107,7 @@ rund 29 px. Der Test in `werkzeuge/durchstich-test.js` prüft das bei jedem Lauf
 
 ## Was als Nächstes drankommt
 
-- **Block 4b:** semantische Stufe (Mistral) hinter der Wortliste, nebenläufig, harter
-  3-Sekunden-Timeout, bei Ausfall Rückfall in die Moderationsqueue statt Verwerfen
+- **Block 5:** Moderationsoberfläche — solange sie fehlt, bleibt alles mit `PRUEFEN` liegen
 - **Block 5:** Moderationsoberfläche und die feine Scheduler-Logik
 - **Block 6:** Bridge auf dem Medien-PC — der Simulator wird gegen Arena getauscht, beide bleiben
   umschaltbar

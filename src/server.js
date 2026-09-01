@@ -12,6 +12,7 @@ const { FLAECHEN } = require('./flaechen');
 const { abfragen } = require('./db');
 const { groesseFuer, passendeFlaechen } = require('./text');
 const filter = require('./filter');
+const mistral = require('./mistral');
 const scheduler = require('./scheduler');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
@@ -45,11 +46,16 @@ fastify.post('/api/botschaft', async (req, reply) => {
   const token = crypto.randomBytes(9).toString('base64url');
   const jetzt = Date.now();
 
-  // Filterkette Stufe 1a. ABLEHNEN und PRUEFEN entscheidet sie allein;
-  // ueber ein FREI entscheidet spaeter zusaetzlich Stufe 1b (Sprachmodell).
-  const pruefung = filter.pruefen(text, name);
-  const status = pruefung.urteil === 'ABLEHNEN' ? 'abgelehnt'
-    : pruefung.urteil === 'FREI' && cfg.autoFreigabe ? 'freigegeben'
+  // Filterkette. Stufe 1a entscheidet sofort und ohne Netz; nur was sie nicht
+  // schon abgelehnt hat, geht an das Sprachmodell. Es zaehlt immer das
+  // strengere der beiden Urteile — 1b darf verschaerfen, nie freigeben.
+  const stufe1a = filter.pruefen(text, name);
+  const stufe1b = stufe1a.urteil === 'ABLEHNEN' ? null : await mistral.bewerten(text, name);
+  const urteil = strengeres(stufe1a.urteil, stufe1b && stufe1b.urteil);
+  const pruefung = { urteil, stufe1a, stufe1b };
+
+  const status = urteil === 'ABLEHNEN' ? 'abgelehnt'
+    : urteil === 'FREI' && cfg.autoFreigabe ? 'freigegeben'
       : 'neu';
 
   const info = abfragen.einfuegen.run({
@@ -63,7 +69,7 @@ fastify.post('/api/botschaft', async (req, reply) => {
   // Fehler im selben Fenster gezeigt — sein Text bleibt stehen und er kann
   // ihn umschreiben.
   if (status === 'abgelehnt') {
-    req.log.info({ id: info.lastInsertRowid, gruende: pruefung.gruende }, 'Botschaft abgelehnt (Stufe 1a)');
+    req.log.info({ id: info.lastInsertRowid, pruefung }, 'Botschaft abgelehnt');
     return reply.code(422).send({ fehler: cfg.textAblehnung });
   }
 
@@ -112,7 +118,14 @@ fastify.get('/api/flaechen', async () => FLAECHEN.map(f => ({
 fastify.get('/api/kennzahlen', async () => {
   const nach = {};
   for (const r of abfragen.kennzahlen.all()) nach[r.status] = r.n;
-  return { botschaften: nach, flaechen: FLAECHEN.length, standzeit: cfg.standzeitSekunden, autoFreigabe: cfg.autoFreigabe };
+  return {
+    botschaften: nach,
+    flaechen: FLAECHEN.length,
+    standzeit: cfg.standzeitSekunden,
+    autoFreigabe: cfg.autoFreigabe,
+    // Damit am Abend in einem Blick sichtbar ist, ob die Kette noch mitkommt.
+    stufe1b: { aktiv: mistral.aktiv(), modell: cfg.mistralModell, ...mistral.kennzahlen() }
+  };
 });
 
 // Wie groß würde ein Text auf welcher Fläche? Nützlich beim Einrichten und für
@@ -132,6 +145,12 @@ fastify.get('/api/gesundheit', async () => ({ ok: true, zeit: Date.now() }));
 fastify.get('/', (req, reply) => reply.sendFile('index.html'));
 fastify.get('/status', (req, reply) => reply.sendFile('status.html'));
 fastify.get('/simulator', (req, reply) => reply.sendFile('simulator.html'));
+
+const RANG = { FREI: 0, PRUEFEN: 1, ABLEHNEN: 2 };
+function strengeres (a, b) {
+  if (!b) return a;
+  return RANG[b] > RANG[a] ? b : a;
+}
 
 function flaecheInfo (nr) {
   const f = FLAECHEN.find(x => x.nr === nr);

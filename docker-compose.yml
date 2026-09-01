@@ -18,6 +18,12 @@ services:
       EMPFOHLENE_ZEICHEN: 35
       MAX_VERSALHOEHE: 40
       MIN_VERSALHOEHE: 22
+      # Stufe 1b. Der Schluessel steht in Coolify unter Environment Variables
+      # und niemals hier - diese Datei liegt im Repository.
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MISTRAL_MODELL: ${MISTRAL_MODELL:-mistral-small-2603}
+      MISTRAL_ZEITLIMIT_MS: ${MISTRAL_ZEITLIMIT_MS:-3000}
+      MISTRAL_PARALLEL: ${MISTRAL_PARALLEL:-4}
     volumes:
       - botschaft-daten:/daten
     expose:

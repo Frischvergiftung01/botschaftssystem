@@ -2,7 +2,8 @@
 //
 // Drei Ränge, wie in der Richtlinie beschrieben:
 //   hart   → sofort ablehnen, ohne Moderation und ohne Sprachmodell
-//   weich  → in die Moderationsqueue; das Sprachmodell darf freigeben
+//   weich  → in die Moderationsqueue. Auch das Sprachmodell holt sie da nicht
+//            wieder heraus: es darf nur verschaerfen, freigeben darf nur ein Mensch
 //   ausnahmen → heben einen Treffer wieder auf ("die linke Hand")
 //
 // Die Einträge werden beim Laden durch dieselbe Normalisierung geschickt wie
@@ -57,7 +58,7 @@ module.exports = {
   ],
 
   // ----------------------------------------------------------------- weich
-  // Geht in die Moderation. Das Sprachmodell darf freigeben, die Wortliste nicht.
+  // Geht in die Moderation - endgueltig fuer Stufe 1. Im Zweifel nein.
   weich: [
     // Zahlen- und Buchstabencodes, die auch harmlos vorkommen
     '88', '18', '28', '1312', 'acab', '161', '162', 'hh', 'ns', 'ss',
