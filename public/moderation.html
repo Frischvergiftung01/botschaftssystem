@@ -34,6 +34,9 @@
   nav button.aktiv{background:var(--feld);color:var(--text)}
   kbd{font:inherit;font-size:.72rem;color:var(--leise);border:1px solid var(--rand);
     border-radius:5px;padding:0 4px;margin-left:6px}
+  /* Auf den farbigen Knoepfen ist die Schrift dunkel — das Kuerzel erbt sie,
+     sonst steht Graublau auf Gruen und ist nicht zu lesen. */
+  .knoepfe kbd, .leiste kbd{color:inherit;border-color:currentColor;opacity:.7}
 
   main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;max-width:1400px;width:100%;margin:0 auto}
 
