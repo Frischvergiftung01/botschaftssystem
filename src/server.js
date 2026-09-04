@@ -1,8 +1,9 @@
-// Fastify-Backend. Vier Aufgaben:
+// Fastify-Backend. Fünf Aufgaben:
 //   1. Botschaften annehmen        POST /api/botschaft
 //   2. Status je Absender liefern  GET  /api/status/:token
 //   3. Anzeigezustand ausliefern   GET  /api/anzeige      (Simulator und später die Bridge)
-//   4. Die drei Seiten ausliefern  /  /status  /simulator
+//   4. Moderation bedienen         /moderation und /api/moderation/*   (Block 5)
+//   5. Die Seiten ausliefern       /  /status  /simulator  /moderation
 
 const path = require('path');
 const crypto = require('crypto');
@@ -14,8 +15,32 @@ const { groesseFuer, passendeFlaechen } = require('./text');
 const filter = require('./filter');
 const mistral = require('./mistral');
 const scheduler = require('./scheduler');
+const auth = require('./auth');
+const moderation = require('./moderation');
+const einstellungen = require('./einstellungen');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
+
+// ---------------------------------------------------------------- Zugangsschutz
+// Alles unter /moderation und /api/moderation/ ist geschlossen. Der Schutz sitzt
+// bewusst hier als Torwächter und nicht in den einzelnen Routen — eine vergessene
+// Route wäre eine offene Freigabeseite im Netz.
+
+fastify.addHook('onRequest', async (req, reply) => {
+  const pfad = (req.raw.url || '').split('?')[0];
+  // Bewusst mit startsWith und ohne Schraegstrich: sonst laege die Seite unter
+  // ihrem Dateinamen (/moderation.html) offen im Netz - @fastify/static liefert
+  // alles aus public/ auch direkt aus.
+  const geschuetzt = pfad.startsWith('/moderation') || pfad.startsWith('/api/moderation/');
+  if (!geschuetzt) return;
+
+  reply.header('x-robots-tag', 'noindex, nofollow');
+  if (pfad === '/moderation/anmelden' || pfad === '/api/moderation/anmelden') return;
+  if (auth.angemeldet(req)) return;
+
+  if (pfad.startsWith('/api/')) return reply.code(401).send({ fehler: 'Nicht angemeldet.' });
+  return reply.redirect('/moderation/anmelden');
+});
 
 // ---------------------------------------------------------------- Botschaft annehmen
 
@@ -54,15 +79,20 @@ fastify.post('/api/botschaft', async (req, reply) => {
   const urteil = strengeres(stufe1a.urteil, stufe1b && stufe1b.urteil);
   const pruefung = { urteil, stufe1a, stufe1b };
 
+  // Der Schalter steht seit Block 5 in der Datenbank und wird in der Moderation
+  // umgelegt; die Umgebungsvariable ist nur der Startwert.
+  const autoFreigabe = einstellungen.schalter().autoFreigabe;
   const status = urteil === 'ABLEHNEN' ? 'abgelehnt'
-    : urteil === 'FREI' && cfg.autoFreigabe ? 'freigegeben'
+    : urteil === 'FREI' && autoFreigabe ? 'freigegeben'
       : 'neu';
 
   const info = abfragen.einfuegen.run({
     text, name: name || null, status, token, geraet,
     filter: JSON.stringify(pruefung),
     erstellt_am: jetzt,
-    entschieden_am: status === 'neu' ? null : jetzt
+    entschieden_am: status === 'neu' ? null : jetzt,
+    // Grenzfälle stehen in der Moderationsqueue vorn und werden rot umrandet.
+    unsicher: urteil === 'PRUEFEN' ? 1 : 0
   });
 
   // Abgelehntes wird protokolliert (Richtlinie 9), dem Absender aber als
@@ -122,14 +152,15 @@ fastify.get('/api/kennzahlen', async () => {
     botschaften: nach,
     flaechen: FLAECHEN.length,
     standzeit: cfg.standzeitSekunden,
-    autoFreigabe: cfg.autoFreigabe,
+    autoFreigabe: einstellungen.schalter().autoFreigabe,
+    schalter: einstellungen.schalter(),
     // Damit am Abend in einem Blick sichtbar ist, ob die Kette noch mitkommt.
     stufe1b: { aktiv: mistral.aktiv(), modell: cfg.mistralModell, ...mistral.kennzahlen() }
   };
 });
 
 // Wie groß würde ein Text auf welcher Fläche? Nützlich beim Einrichten und für
-// die spätere Vorschau in der Moderation.
+// die Vorschau in der Moderation.
 fastify.get('/api/probe', async (req) => {
   const text = String(req.query.text ?? '');
   return {
@@ -140,11 +171,75 @@ fastify.get('/api/probe', async (req) => {
 
 fastify.get('/api/gesundheit', async () => ({ ok: true, zeit: Date.now() }));
 
+// ---------------------------------------------------------------- Moderation (Block 5)
+
+fastify.post('/api/moderation/anmelden', async (req, reply) => {
+  const herkunft = String(req.ip || 'unbekannt');
+  if (!auth.kennwortGesetzt()) {
+    return reply.code(503).send({ fehler: `Es ist kein Moderationskennwort gesetzt (MODERATION_KENNWORT, mindestens ${auth.MINDESTLAENGE} Zeichen).` });
+  }
+  if (auth.gesperrt(herkunft)) {
+    return reply.code(429).send({ fehler: 'Zu viele Fehlversuche. Bitte in fünf Minuten noch einmal.' });
+  }
+  if (!auth.kennwortStimmt(String(req.body?.kennwort ?? ''))) {
+    auth.fehlversuch(herkunft);
+    await new Promise(r => setTimeout(r, 400));   // Raten unattraktiv machen
+    return reply.code(401).send({ fehler: 'Kennwort stimmt nicht.' });
+  }
+  auth.versucheVergessen(herkunft);
+  auth.anmelden(reply, req);
+  req.log.info({ herkunft }, 'Moderation angemeldet');
+  return { ok: true };
+});
+
+fastify.post('/api/moderation/abmelden', async (req, reply) => {
+  auth.abmelden(reply, req);
+  return { ok: true };
+});
+
+fastify.get('/api/moderation/queue', async (req) => {
+  const ansicht = String(req.query.ansicht ?? 'einzeln');
+  const grenze = Math.min(200, Math.max(1, Number(req.query.grenze) || 60));
+  return { ansicht, botschaften: moderation.queue(ansicht, grenze), kennzahlen: moderation.kennzahlen() };
+});
+
+fastify.get('/api/moderation/kennzahlen', async () => moderation.kennzahlen());
+
+fastify.post('/api/moderation/entscheiden', async (req, reply) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids : [req.body?.id];
+  const entscheidung = String(req.body?.entscheidung ?? '');
+  if (!moderation.ZIEL[entscheidung]) return reply.code(400).send({ fehler: 'Unbekannte Entscheidung.' });
+  const ergebnis = moderation.entscheiden(ids, entscheidung);
+  req.log.info({ ids, entscheidung, ...ergebnis }, 'Moderationsentscheidung');
+  return { ...ergebnis, kennzahlen: moderation.kennzahlen() };
+});
+
+fastify.post('/api/moderation/schalter', async (req, reply) => {
+  const name = String(req.body?.name ?? '');
+  if (!['autoFreigabe', 'nachschub'].includes(name)) return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
+  const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
+  req.log.warn({ name, wert: Boolean(req.body?.wert) }, 'Schalter umgelegt');
+  return { schalter: stand };
+});
+
+fastify.post('/api/moderation/datenbank-leeren', async (req, reply) => {
+  if (!cfg.datenbankLeerenErlaubt) return reply.code(403).send({ fehler: 'Auf diesem Stand abgeschaltet (DATENBANK_LEEREN=false).' });
+  if (String(req.body?.bestaetigung ?? '') !== 'LEEREN') return reply.code(400).send({ fehler: 'Bitte LEEREN zur Bestätigung eintippen.' });
+  const geloescht = moderation.datenbankLeeren();
+  req.log.warn({ geloescht }, 'Datenbank geleert');
+  return { geloescht };
+});
+
 // ---------------------------------------------------------------- Seiten
 
 fastify.get('/', (req, reply) => reply.sendFile('index.html'));
 fastify.get('/status', (req, reply) => reply.sendFile('status.html'));
 fastify.get('/simulator', (req, reply) => reply.sendFile('simulator.html'));
+fastify.get('/moderation', (req, reply) => reply.sendFile('moderation.html'));
+fastify.get('/moderation/anmelden', (req, reply) => {
+  if (auth.angemeldet(req)) return reply.redirect('/moderation');
+  return reply.sendFile('anmeldung.html');
+});
 
 const RANG = { FREI: 0, PRUEFEN: 1, ABLEHNEN: 2 };
 function strengeres (a, b) {
@@ -160,8 +255,11 @@ function hash (s) { return crypto.createHash('sha256').update(s).digest('hex').s
 
 async function start () {
   scheduler.starten();
+  if (!auth.kennwortGesetzt()) {
+    fastify.log.warn('MODERATION_KENNWORT ist nicht gesetzt — die Moderationsoberfläche bleibt geschlossen.');
+  }
   await fastify.listen({ port: cfg.port, host: cfg.host });
-  fastify.log.info(`Botschaftssystem läuft — Eingabe: http://localhost:${cfg.port}/  Simulator: http://localhost:${cfg.port}/simulator`);
+  fastify.log.info(`Botschaftssystem läuft — Eingabe: http://localhost:${cfg.port}/  Moderation: http://localhost:${cfg.port}/moderation`);
 }
 
 if (require.main === module) start().catch(e => { fastify.log.error(e); process.exit(1); });

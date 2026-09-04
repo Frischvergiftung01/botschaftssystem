@@ -1,7 +1,8 @@
 # Botschaftssystem — Königsbau 2026
 
 Publikumsbotschaften auf der Fassade des Königsbaus, Lange Nacht am **7. November 2026**.
-Dieses Repository ist **Block 2** aus dem Umsetzungsplan: der Durchstich vom Handy bis auf die Fläche.
+Dieses Repository enthält die **Blöcke 2 bis 5** aus dem Umsetzungsplan: den Durchstich vom Handy
+bis auf die Fläche, die Filterkette und die Moderation.
 
 ## Was schon läuft
 
@@ -15,6 +16,7 @@ wann und wo.
 | Eingabe | `/` | Besucher tippen ihre Botschaft, mit Live-Vorschau in Projektionsoptik |
 | Status | `/status?t=…` | „noch 12 vor dir" bzw. „jetzt auf Säule Mitte 03" |
 | Simulator | `/simulator` | die Fassade im Browser, solange kein Projektor läuft |
+| Moderation | `/moderation` | Freigeben, Ablehnen, Zurückstellen — mit Kennwort |
 
 ## Starten
 
@@ -22,7 +24,15 @@ wann und wo.
 npm install
 npm run seed     # ein paar Beispielbotschaften, damit etwas zu sehen ist
 npm start        # http://localhost:3000
-npm test         # Durchstich-Test: Absenden -> Fläche -> Status
+npm test         # Durchstich, Filterkette und Moderation
+npm run queue-fuellen -- 300   # Übungsfutter für die Durchsatzprobe
+```
+
+Für die Moderation muss `MODERATION_KENNWORT` gesetzt sein (mindestens 8 Zeichen), sonst bleibt
+`/moderation` geschlossen:
+
+```bash
+MODERATION_KENNWORT=… npm start
 ```
 
 Node 20 oder neuer. Ohne weitere Dienste — die Datenbank ist eine Datei unter `data/`.
@@ -39,10 +49,13 @@ src/mistral.js     Stufe 1b: Sprachmodell, hartes Zeitlimit, Ausfall -> Queue
 src/richtlinie.js  der Auftrag an das Modell - verdichtete Filterrichtlinie
 src/normalisierung.js  glaettet Leetspeak, Sperrschrift, Trennzeichen, Wiederholungen
 src/wortliste.js   die drei Raenge hart / weich / Ausnahmen — nicht weitergeben
+src/moderation.js  Queue, Sammelentscheidungen, Kennzahlen, Datenbank leeren (Block 5)
+src/auth.js        Zugangsschutz der Moderation: ein Kennwort, signiertes Cookie
+src/einstellungen.js  Schalter, die im Betrieb umgelegt werden und den Neustart überleben
 src/db.js          SQLite-Schema
 src/config.js      alle Stellschrauben, per Umgebungsvariable überschreibbar
-public/            die drei Seiten, ohne Framework und ohne Build
-werkzeuge/         Seed, Durchstich-Test und Filter-Test
+public/            die Seiten, ohne Framework und ohne Build
+werkzeuge/         Seed, Queue-Füller und die drei Tests
 ```
 
 ## Filterkette, Stufe 1a
@@ -113,12 +126,38 @@ Text, `Schrifthoehe` und `Y Versatz`.
 landet auf einer 437er Säule bei **28,5 px Versalhöhe**. Der Erfahrungswert von der Fassade war
 rund 29 px. Der Test in `werkzeuge/durchstich-test.js` prüft das bei jedem Lauf.
 
+## Moderation (Block 5)
+
+Der Engpass des Abends ist nicht die Fassade, sondern dieser Bildschirm: **500 Entscheidungen je
+Stunde** muss eine Person schaffen. Die Oberfläche ist darauf gebaut.
+
+- **Einzeln** — eine Botschaft groß in Projektionsoptik, drei Knöpfe, Auto-Advance.
+  Tasten: `1`/`F` freigeben, `2`/`A` ablehnen, `3`/`Z` zurückstellen, `U` rückgängig.
+  Grenzfälle des Filters stehen vorn und sind rot umrandet, mit dem Grund daneben.
+- **Raster** — zwölf unauffällige Botschaften auf einmal, Anklicken nimmt eine heraus,
+  ein Knopf gibt die übrigen frei. Das ist der Durchsatzhebel.
+- **Auf der Fassade** — was gerade läuft, mit `Sperren`: die Botschaft verschwindet **sofort**
+  von der Fläche, nicht erst nach Ablauf der Standzeit.
+- **Schalter im Kopf** — `Auto-Freigabe` (saubere Botschaften ohne Moderation durchlassen) und
+  `Nachschub` (Zuteilung anhalten, Laufendes läuft aus). Beide stehen in der Datenbank und
+  überleben einen Neustart.
+
+**Der Not-Aus liegt nicht hier, sondern in Resolume:** die MESSAGES-Ebenen ausschalten. Das ist der
+einzige Weg, der auch dann noch wirkt, wenn Netz, Bridge oder dieser Dienst hängen.
+
+Zugang: ein gemeinsames Kennwort aus `MODERATION_KENNWORT`, danach ein signiertes Cookie
+(`MODERATION_SITZUNG_STUNDEN`, Vorgabe 14). Wird das Kennwort gewechselt, sind alle Sitzungen sofort
+ungültig. Ohne Kennwort bleibt die Oberfläche zu — auch unter `/moderation.html`.
+
+**Durchsatzprobe:** `npm run queue-fuellen -- 300`, dann `/moderation` öffnen und die Stoppuhr
+laufen lassen. Der Kopf zeigt „letzte 5 min" und die Hochrechnung auf die Stunde.
+
 ## Was als Nächstes drankommt
 
-- **Block 5:** Moderationsoberfläche — solange sie fehlt, bleibt alles mit `PRUEFEN` liegen
-- **Block 5:** Moderationsoberfläche und die feine Scheduler-Logik
 - **Block 6:** Bridge auf dem Medien-PC — der Simulator wird gegen Arena getauscht, beide bleiben
   umschaltbar
+- **Block 7:** Ausbau — Statusseite mit Fassadenplan, Monitoring, Seed-Pool
+- **Block 8:** Härtung — Lasttest, Red-Team, Vollprobe
 
 ## Schrift
 

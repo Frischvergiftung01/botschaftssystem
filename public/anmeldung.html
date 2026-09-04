@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Moderation — Anmeldung</title>
+<style>
+  :root{--grund:#0d0f14;--feld:#171b23;--rand:#2a3040;--text:#f2f4f8;--leise:#98a1b3;--gold:#ffcf6b;--warn:#ff9a6b}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--grund);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{display:flex;align-items:center;justify-content:center;padding:24px}
+  form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px}
+  h1{font-size:1.15rem;margin:0}
+  p{margin:0;color:var(--leise);font-size:.9rem;line-height:1.5}
+  input{width:100%;background:var(--feld);color:var(--text);border:1px solid var(--rand);
+    border-radius:12px;padding:14px;font:inherit;font-size:1.05rem}
+  input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
+  button{background:var(--gold);color:#1a1206;border:0;border-radius:12px;padding:14px;
+    font:inherit;font-size:1.02rem;font-weight:650;cursor:pointer}
+  .fehler{color:var(--warn);min-height:1.2em;font-size:.9rem}
+</style>
+</head>
+<body>
+<form id="formular" autocomplete="off">
+  <h1>Moderation</h1>
+  <p>Publikumsbotschaften Königsbau — Zugang nur für den Moderationsplatz.</p>
+  <input id="kennwort" type="password" placeholder="Kennwort" autocomplete="current-password" autofocus>
+  <button type="submit">Anmelden</button>
+  <div class="fehler" id="fehler"></div>
+</form>
+<script>
+const formular = document.getElementById('formular');
+const fehler = document.getElementById('fehler');
+formular.addEventListener('submit', async e => {
+  e.preventDefault();
+  fehler.textContent = '';
+  const antwort = await fetch('/api/moderation/anmelden', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ kennwort: document.getElementById('kennwort').value })
+  });
+  if (antwort.ok) { location.href = '/moderation'; return; }
+  const d = await antwort.json().catch(() => ({}));
+  fehler.textContent = d.fehler || 'Anmeldung fehlgeschlagen.';
+});
+</script>
+</body>
+</html>

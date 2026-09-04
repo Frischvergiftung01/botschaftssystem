@@ -11,8 +11,14 @@ services:
     environment:
       PORT: 3000
       DB_PFAD: /daten/botschaften.db
-      # Solange die Filterkette (Block 4) fehlt, geht alles direkt in die Anzeige:
-      AUTO_FREIGABE: "true"
+      # Startwert; im Betrieb legt die Moderation den Schalter um (Block 5).
+      AUTO_FREIGABE: ${AUTO_FREIGABE:-true}
+      # Moderation (Block 5). Ohne Kennwort bleibt /moderation geschlossen -
+      # der Wert steht in Coolify unter Environment Variables, nie hier.
+      MODERATION_KENNWORT: ${MODERATION_KENNWORT:-}
+      MODERATION_SITZUNG_STUNDEN: ${MODERATION_SITZUNG_STUNDEN:-14}
+      RASTER_GROESSE: ${RASTER_GROESSE:-12}
+      DATENBANK_LEEREN: ${DATENBANK_LEEREN:-true}
       STANDZEIT: 25
       MAX_ZEICHEN: 120
       EMPFOHLENE_ZEICHEN: 35

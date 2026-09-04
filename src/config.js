@@ -18,6 +18,10 @@ module.exports = {
   // was mit einem sauberen FREI passiert: true = direkt in die Anzeige,
   // false = trotzdem erst durch die Moderation. Ein PRUEFEN geht in jedem
   // Fall in die Queue, ein ABLEHNEN in jedem Fall zurueck.
+  //
+  // Ab Block 5 ist das nur noch der STARTWERT. Der laufende Schalter steht in
+  // der Datenbank (Tabelle `einstellungen`) und wird in der Moderation
+  // umgelegt — am Abend soll niemand auf einen Redeploy warten muessen.
   autoFreigabe: process.env.AUTO_FREIGABE !== 'false',
 
   // Stufe 1b — Sprachmodell. Ohne Schluessel ist sie stillgelegt und die
@@ -36,6 +40,17 @@ module.exports = {
   // Anleitung fuer den naechsten Versuch (Filterrichtlinie, Abschnitt 2 und 7).
   textAblehnung: process.env.TEXT_ABLEHNUNG
     || 'Diese Botschaft können wir leider nicht zeigen. Versuch es gern mit anderen Worten.',
+
+  // Moderation (Block 5).
+  // Ohne gesetztes Kennwort bleibt die Oberflaeche ZU. Eine offene
+  // Freigabeseite im Netz waere schlimmer als gar keine. Das Kennwort steht in
+  // Coolify unter Environment Variables, niemals im Repository.
+  moderationKennwort: (process.env.MODERATION_KENNWORT || '').trim().replace(/^["']|["']$/g, ''),
+  moderationSitzungStunden: Number(process.env.MODERATION_SITZUNG_STUNDEN || 14),
+  rasterGroesse: Number(process.env.RASTER_GROESSE || 12),
+  // Das Werkzeug "Datenbank leeren" gehoert in die Vorbereitung, nicht in den
+  // Veranstaltungsabend. Am 5. November auf false stellen.
+  datenbankLeerenErlaubt: process.env.DATENBANK_LEEREN !== 'false',
 
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),

@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Moderation — Königsbau</title>
+<link rel="stylesheet" href="/schrift/schrift.css">
+<style>
+  :root{
+    --grund:#0b0d12;--feld:#151922;--rand:#242c3a;--text:#f2f4f8;--leise:#98a1b3;
+    --gold:#ffcf6b;--gut:#5fd08a;--warn:#ff7a6b;--vertagt:#8fb6ff;--unsicher:#ff5b4a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--grund);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{min-height:100dvh;display:flex;flex-direction:column}
+
+  header{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;
+    padding:10px 16px;border-bottom:1px solid var(--rand);position:sticky;top:0;background:var(--grund);z-index:5}
+  .marke{font-weight:650}
+  .zahlen{display:flex;gap:16px;flex-wrap:wrap;color:var(--leise);font-size:.85rem}
+  .zahlen b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:650}
+  .zahlen .achtung b{color:var(--unsicher)}
+  .rechts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .pille{background:var(--feld);color:var(--text);border:1px solid var(--rand);border-radius:999px;
+    padding:6px 12px;font:inherit;font-size:.82rem;cursor:pointer;white-space:nowrap}
+  .pille.an{border-color:var(--gut);color:var(--gut)}
+  .pille.aus{border-color:var(--warn);color:var(--warn)}
+
+  nav{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--rand);overflow-x:auto}
+  nav button{background:none;border:0;color:var(--leise);font:inherit;font-size:.9rem;
+    padding:8px 12px;border-radius:10px;cursor:pointer;white-space:nowrap}
+  nav button.aktiv{background:var(--feld);color:var(--text)}
+  kbd{font:inherit;font-size:.72rem;color:var(--leise);border:1px solid var(--rand);
+    border-radius:5px;padding:0 4px;margin-left:6px}
+
+  main{flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;max-width:1400px;width:100%;margin:0 auto}
+
+  /* Projektionsoptik: schwarzer Grund, Oswald, echte Versalhöhe und Y-Versatz —
+     dasselbe Rechenwerk wie im Simulator, damit die Moderation sieht,
+     was an der Fassade steht. */
+  .buehne{position:relative;background:#000;border:1px solid var(--rand);border-radius:4px;overflow:hidden;width:100%}
+  .buehne span{position:absolute;white-space:nowrap;color:#fff;line-height:1;
+    font-family:Oswald,"Arial Narrow",sans-serif}
+  .unsicher .buehne{border-color:var(--unsicher);box-shadow:0 0 0 2px rgba(255,91,74,.35)}
+
+  .karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;padding:14px}
+  .kopfzeile{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;color:var(--leise);font-size:.82rem;margin-bottom:10px}
+  .kopfzeile .marker{color:var(--unsicher);font-weight:650}
+  .roh{font-size:1.05rem;margin:12px 0 6px;line-height:1.4;word-break:break-word}
+  .gruende{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .grund{background:#221a1a;border:1px solid #4a2b26;color:#ffb3a6;border-radius:8px;padding:3px 8px;font-size:.78rem}
+
+  .knoepfe{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .knoepfe button{flex:1;min-width:150px;border:0;border-radius:14px;padding:16px 14px;
+    font:inherit;font-size:1.02rem;font-weight:650;cursor:pointer}
+  .frei{background:var(--gut);color:#04240f}
+  .weg{background:var(--warn);color:#2b0b06}
+  .spaeter{background:var(--vertagt);color:#08172f}
+  .knoepfe .klein{flex:0 0 auto;min-width:0;background:var(--feld);color:var(--leise);
+    border:1px solid var(--rand);font-weight:500;font-size:.9rem;padding:16px 14px}
+
+  #raster .kacheln{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+  .kachel{background:var(--feld);border:1px solid var(--rand);border-radius:12px;padding:10px;cursor:pointer;
+    transition:opacity .12s,border-color .12s}
+  .kachel .roh{font-size:.86rem;color:var(--leise);margin:8px 0 0}
+  .kachel.raus{opacity:.4;border-color:var(--warn)}
+  .kachel.raus .roh::before{content:"herausgenommen — ";color:var(--warn)}
+  .leiste{position:sticky;bottom:0;background:var(--grund);border-top:1px solid var(--rand);
+    padding:12px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+  .zeile{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+    background:var(--feld);border:1px solid var(--rand);border-radius:12px;padding:10px}
+  .zeile .knoepfe{margin:0}
+  .zeile .knoepfe button{min-width:0;padding:10px 14px;font-size:.9rem}
+
+  .leer{color:var(--leise);text-align:center;padding:60px 20px;line-height:1.6}
+  .hinweis{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#1b2230;
+    border:1px solid var(--rand);border-radius:12px;padding:10px 16px;font-size:.9rem;
+    opacity:0;pointer-events:none;transition:opacity .15s;z-index:10}
+  .hinweis.da{opacity:1}
+  .fuss{color:#6b748b;font-size:.8rem;line-height:1.6}
+  .werkzeug{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .werkzeug input{background:var(--grund);color:var(--text);border:1px solid var(--rand);
+    border-radius:10px;padding:10px 12px;font:inherit}
+  h2{font-size:.95rem;margin:0 0 4px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="marke">Moderation</div>
+  <div class="zahlen">
+    <span class="achtung">unsicher <b id="zUnsicher">–</b></span>
+    <span>offen <b id="zOffen">–</b></span>
+    <span>letzte 5 min <b id="z5">–</b></span>
+    <span>Durchsatz <b id="zDurchsatz">–</b>/h</span>
+  </div>
+  <div class="rechts">
+    <button class="pille" id="sAuto">Auto-Freigabe</button>
+    <button class="pille" id="sNachschub">Nachschub</button>
+    <button class="pille" id="abmelden">Abmelden</button>
+  </div>
+</header>
+
+<nav>
+  <button data-ansicht="einzeln" class="aktiv">Einzeln<kbd>E</kbd></button>
+  <button data-ansicht="raster">Raster<kbd>R</kbd></button>
+  <button data-ansicht="zurueckgestellt">Zurückgestellt</button>
+  <button data-ansicht="pool">Auf der Fassade</button>
+  <button data-ansicht="abgelehnt">Abgelehnt</button>
+  <button data-ansicht="werkzeuge">Werkzeuge</button>
+</nav>
+
+<main>
+  <section id="einzeln"></section>
+
+  <section id="raster" hidden>
+    <div class="kacheln" id="kacheln"></div>
+    <div class="leiste">
+      <button class="pille" id="rasterFreigeben" style="background:var(--gut);color:#04240f;border:0;padding:12px 18px;font-size:.95rem;font-weight:650">Übrige freigeben <kbd>F</kbd></button>
+      <button class="pille" id="rasterSpaeter">Herausgenommene zurückstellen</button>
+      <button class="pille" id="rasterNeu">Neu laden</button>
+      <span class="fuss" id="rasterStand"></span>
+    </div>
+  </section>
+
+  <section id="liste" hidden></section>
+
+  <section id="werkzeuge" hidden>
+    <div class="karte">
+      <h2>Not-Aus</h2>
+      <p class="fuss">Der Not-Aus liegt <b>nicht</b> in dieser Oberfläche, sondern in Resolume: die
+      MESSAGES-Ebenen ausschalten. Das wirkt auch dann, wenn Netz, Bridge oder dieser Dienst hängen.<br>
+      Hier gibt es die weiche Fassung: <b>Nachschub aus</b> (oben) hält die Zuteilung an, laufende
+      Botschaften laufen aus. Einzelne Botschaften nimmt „Auf der Fassade → Sperren“ sofort herunter.</p>
+    </div>
+    <div class="karte" style="margin-top:14px">
+      <h2>Datenbank leeren</h2>
+      <p class="fuss">Löscht alle Botschaften und Anzeigen — für die Vorbereitung, nicht für den Abend.
+      Zum Bestätigen <b>LEEREN</b> eintippen.</p>
+      <div class="werkzeug">
+        <input id="leerenWort" placeholder="LEEREN" autocomplete="off">
+        <button class="pille" id="leerenKnopf">Datenbank leeren</button>
+        <span class="fuss" id="leerenStand"></span>
+      </div>
+    </div>
+    <div class="karte" style="margin-top:14px">
+      <h2>Tastatur</h2>
+      <p class="fuss"><b>1</b> oder <b>F</b> freigeben · <b>2</b> oder <b>A</b> ablehnen ·
+      <b>3</b> oder <b>Z</b> zurückstellen · <b>U</b> rückgängig · <b>E</b> einzeln · <b>R</b> Raster.
+      Nach jeder Entscheidung rückt die nächste Botschaft nach.</p>
+    </div>
+  </section>
+</main>
+
+<div class="hinweis" id="hinweis"></div>
+
+<script>
+const BANDHOEHE = 44, VERSAL_ANTEIL = 0.81, RAND = 2;
+const el = id => document.getElementById(id);
+let ansicht = 'einzeln';
+let vorrat = [];            // Einzelprüfung
+let rasterVorrat = [];      // Rasteransicht
+let raus = new Set();       // im Raster herausgeklickte ids
+let listenVorrat = [];
+let rueckgaengigStapel = [];
+let stand = {};
+
+start();
+
+async function start () {
+  document.querySelectorAll('nav button').forEach(b =>
+    b.addEventListener('click', () => wechseln(b.dataset.ansicht)));
+  el('abmelden').addEventListener('click', async () => {
+    await fetch('/api/moderation/abmelden', { method: 'POST' });
+    location.href = '/moderation/anmelden';
+  });
+  el('sAuto').addEventListener('click', () => schalten('autoFreigabe'));
+  el('sNachschub').addEventListener('click', () => schalten('nachschub'));
+  el('rasterFreigeben').addEventListener('click', rasterFreigeben);
+  el('rasterSpaeter').addEventListener('click', rasterSpaeter);
+  el('rasterNeu').addEventListener('click', () => laden(true));
+  el('leerenKnopf').addEventListener('click', leeren);
+  document.addEventListener('keydown', taste);
+  window.addEventListener('resize', () => zeichnen());
+  setInterval(zahlenHolen, 5000);
+  await laden(true);
+  setInterval(() => { if (ansicht !== 'werkzeuge') nachfuellen(); }, 10000);
+}
+
+// ---------------------------------------------------------------- Daten
+
+async function laden (frisch) {
+  if (ansicht === 'werkzeuge') { zeichnen(); return; }
+  const antwort = await fetch('/api/moderation/queue?ansicht=' + ansicht + '&grenze=60');
+  if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+  const d = await antwort.json();
+  stand = d.kennzahlen;
+  if (ansicht === 'einzeln') vorrat = d.botschaften;
+  else if (ansicht === 'raster') { rasterVorrat = d.botschaften.slice(0, stand.rasterGroesse || 12); if (frisch) raus = new Set(); }
+  else listenVorrat = d.botschaften;
+  zahlenZeichnen();
+  zeichnen();
+}
+
+async function nachfuellen () {
+  const knapp = (ansicht === 'einzeln' && vorrat.length < 8)
+    || (ansicht === 'raster' && rasterVorrat.length < (stand.rasterGroesse || 12))
+    || (ansicht !== 'einzeln' && ansicht !== 'raster');
+  if (knapp) await laden(false);
+  else zahlenHolen();
+}
+
+async function zahlenHolen () {
+  try {
+    const antwort = await fetch('/api/moderation/kennzahlen');
+    if (!antwort.ok) return;
+    stand = await antwort.json();
+    zahlenZeichnen();
+  } catch (e) { /* Netz weg, gleich noch einmal */ }
+}
+
+function zahlenZeichnen () {
+  if (!stand.offen) return;
+  el('zUnsicher').textContent = stand.offen.unsicher;
+  el('zOffen').textContent = stand.offenGesamt;
+  el('z5').textContent = stand.entschieden5Min;
+  el('zDurchsatz').textContent = stand.durchsatzProStunde;
+  const a = stand.schalter.autoFreigabe, n = stand.schalter.nachschub;
+  el('sAuto').textContent = 'Auto-Freigabe ' + (a ? 'an' : 'aus');
+  el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
+  el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
+  el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  el('leerenKnopf').disabled = !stand.darfLeeren;
+}
+
+// ---------------------------------------------------------------- Zeichnen
+
+function wechseln (neu) {
+  ansicht = neu;
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
+  for (const s of ['einzeln', 'raster', 'liste', 'werkzeuge']) {
+    const sichtbar = neu === s || (s === 'liste' && ['zurueckgestellt', 'pool', 'abgelehnt'].includes(neu));
+    el(s).hidden = !sichtbar;
+  }
+  laden(true);
+}
+
+function zeichnen () {
+  if (ansicht === 'einzeln') zeichnenEinzeln();
+  else if (ansicht === 'raster') zeichnenRaster();
+  else if (ansicht !== 'werkzeuge') zeichnenListe();
+}
+
+function buehneBauen () {
+  const b = document.createElement('div');
+  b.className = 'buehne';
+  b.appendChild(document.createElement('span'));
+  return b;
+}
+
+/** Setzt Schriftgröße und Grundlinie so, wie der Wire-Patch es an der Fassade tut. */
+function buehneMalen (buehne, item) {
+  const breite = buehne.clientWidth;
+  if (!breite) return;
+  const o = item.optik;
+  const skala = breite / o.breite;
+  buehne.style.height = (BANDHOEHE * skala) + 'px';
+  const span = buehne.firstChild;
+  span.textContent = item.voll;
+  const em = o.versalhoehe / VERSAL_ANTEIL;
+  span.style.fontSize = (em * skala) + 'px';
+  const grundlinieAbMitte = 0.452 * em - (o.yVersatz || 0);
+  span.style.top = ((BANDHOEHE / 2 + grundlinieAbMitte - 0.952 * em) * skala) + 'px';
+  const mittig = o.flaeche <= 5;   // Stirnbänder stehen mittig, Säulen linksbündig
+  span.style.left = mittig ? '50%' : (RAND * skala) + 'px';
+  span.style.transform = mittig ? 'translateX(-50%)' : 'none';
+}
+
+function zeitText (ms) {
+  const s = Math.round((Date.now() - ms) / 1000);
+  if (s < 60) return 'vor ' + s + ' s';
+  if (s < 3600) return 'vor ' + Math.round(s / 60) + ' min';
+  return 'vor ' + Math.round(s / 3600) + ' h';
+}
+
+function zeichnenEinzeln () {
+  const ziel = el('einzeln');
+  const item = vorrat[0];
+  ziel.innerHTML = '';
+  if (!item) {
+    ziel.innerHTML = '<div class="leer">Keine offenen Botschaften.<br>' +
+      (stand.schalter && stand.schalter.autoFreigabe
+        ? 'Auto-Freigabe ist an — saubere Botschaften gehen ohne Moderation durch.'
+        : 'Alles gelesen.') + '</div>';
+    return;
+  }
+  const karte = document.createElement('div');
+  karte.className = 'karte' + (item.unsicher ? ' unsicher' : '');
+  const kopf = document.createElement('div');
+  kopf.className = 'kopfzeile';
+  kopf.innerHTML = (item.unsicher ? '<span class="marker">Grenzfall</span>' : '<span>unauffällig</span>') +
+    '<span>' + zeitText(item.erstelltAm) + '</span>' +
+    '<span>' + item.optik.passendeFlaechen + ' von 33 Flächen</span>' +
+    '<span>' + item.voll.length + ' Zeichen</span>' +
+    '<span>' + (vorrat.length - 1) + ' danach</span>';
+  karte.appendChild(kopf);
+  const buehne = buehneBauen();
+  karte.appendChild(buehne);
+  const roh = document.createElement('div');
+  roh.className = 'roh';
+  roh.textContent = item.voll;
+  karte.appendChild(roh);
+  if (item.gruende.length) {
+    const g = document.createElement('div');
+    g.className = 'gruende';
+    for (const t of item.gruende) {
+      const c = document.createElement('span'); c.className = 'grund'; c.textContent = t; g.appendChild(c);
+    }
+    karte.appendChild(g);
+  }
+  const knoepfe = document.createElement('div');
+  knoepfe.className = 'knoepfe';
+  knoepfe.innerHTML =
+    '<button class="frei" data-e="freigeben">Freigeben <kbd>1</kbd></button>' +
+    '<button class="weg" data-e="ablehnen">Ablehnen <kbd>2</kbd></button>' +
+    '<button class="spaeter" data-e="zurueckstellen">Zurückstellen <kbd>3</kbd></button>' +
+    '<button class="klein" data-e="rueckgaengig">Rückgängig <kbd>U</kbd></button>';
+  karte.appendChild(knoepfe);
+  ziel.appendChild(karte);
+  buehneMalen(buehne, item);
+  knoepfe.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    if (b.dataset.e === 'rueckgaengig') rueckgaengig();
+    else entscheiden([item.id], b.dataset.e, 'neu');
+  }));
+}
+
+function zeichnenRaster () {
+  const ziel = el('kacheln');
+  ziel.innerHTML = '';
+  if (!rasterVorrat.length) {
+    ziel.innerHTML = '<div class="leer">Keine unauffälligen Botschaften in der Warteschlange.</div>';
+    el('rasterStand').textContent = '';
+    return;
+  }
+  for (const item of rasterVorrat) {
+    const k = document.createElement('div');
+    k.className = 'kachel' + (raus.has(item.id) ? ' raus' : '');
+    const buehne = buehneBauen();
+    k.appendChild(buehne);
+    const roh = document.createElement('div');
+    roh.className = 'roh';
+    roh.textContent = item.voll;
+    k.appendChild(roh);
+    k.addEventListener('click', () => {
+      if (raus.has(item.id)) raus.delete(item.id); else raus.add(item.id);
+      zeichnenRaster();
+    });
+    ziel.appendChild(k);
+    buehneMalen(buehne, item);
+  }
+  const uebrig = rasterVorrat.filter(b => !raus.has(b.id)).length;
+  el('rasterStand').textContent = uebrig + ' von ' + rasterVorrat.length + ' würden freigegeben — Anklicken nimmt eine heraus.';
+}
+
+function zeichnenListe () {
+  const ziel = el('liste');
+  ziel.innerHTML = '';
+  if (!listenVorrat.length) {
+    ziel.innerHTML = '<div class="leer">Nichts vorhanden.</div>';
+    return;
+  }
+  for (const item of listenVorrat) {
+    const zeile = document.createElement('div');
+    zeile.className = 'zeile' + (item.unsicher ? ' unsicher' : '');
+    const links = document.createElement('div');
+    const buehne = buehneBauen();
+    links.appendChild(buehne);
+    const roh = document.createElement('div');
+    roh.className = 'roh';
+    roh.textContent = item.voll + (item.anzahlAnzeigen ? '  ·  ' + item.anzahlAnzeigen + '× gezeigt' : '');
+    links.appendChild(roh);
+    zeile.appendChild(links);
+
+    const knoepfe = document.createElement('div');
+    knoepfe.className = 'knoepfe';
+    if (ansicht === 'pool') {
+      knoepfe.innerHTML = '<button class="weg" data-e="sperren">Sperren</button>';
+    } else if (ansicht === 'zurueckgestellt') {
+      knoepfe.innerHTML = '<button class="frei" data-e="freigeben">Freigeben</button>' +
+        '<button class="weg" data-e="ablehnen">Ablehnen</button>';
+    } else {
+      knoepfe.innerHTML = '<button class="frei" data-e="freigeben">Doch freigeben</button>';
+    }
+    knoepfe.querySelectorAll('button').forEach(b => b.addEventListener('click', () =>
+      entscheiden([item.id], b.dataset.e, item.status)));
+    zeile.appendChild(knoepfe);
+    ziel.appendChild(zeile);
+    buehneMalen(buehne, item);
+  }
+}
+
+// ---------------------------------------------------------------- Entscheiden
+
+async function entscheiden (ids, entscheidung, vorher) {
+  if (!ids.length) return;
+  // Erst aus der Ansicht nehmen, dann melden: bei 500 Entscheidungen in der
+  // Stunde darf niemand auf das Netz warten.
+  vorrat = vorrat.filter(b => !ids.includes(b.id));
+  rasterVorrat = rasterVorrat.filter(b => !ids.includes(b.id));
+  listenVorrat = listenVorrat.filter(b => !ids.includes(b.id));
+  for (const id of ids) raus.delete(id);
+  zeichnen();
+  if (entscheidung !== 'zurueckholen') rueckgaengigStapel.push({ ids, vorher: vorher || 'neu' });
+
+  try {
+    const antwort = await fetch('/api/moderation/entscheiden', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ids, entscheidung })
+    });
+    if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+    const d = await antwort.json();
+    stand = d.kennzahlen;
+    zahlenZeichnen();
+    const wort = { freigeben: 'freigegeben', ablehnen: 'abgelehnt', zurueckstellen: 'zurückgestellt', sperren: 'gesperrt', zurueckholen: 'zurückgeholt' }[entscheidung];
+    melden(ids.length + ' ' + wort + (d.geraeumt ? ' · ' + d.geraeumt + ' Fläche(n) sofort geräumt' : '') + '  ·  U = rückgängig');
+    if (vorrat.length < 8 || rasterVorrat.length < (stand.rasterGroesse || 12)) laden(false);
+  } catch (e) {
+    melden('Nicht durchgekommen — bitte neu laden.');
+  }
+}
+
+function rueckgaengig () {
+  const letzte = rueckgaengigStapel.pop();
+  if (!letzte) { melden('Nichts zum Rückgängigmachen.'); return; }
+  const zurueck = { neu: 'zurueckholen', freigegeben: 'freigeben', zurueckgestellt: 'zurueckstellen', abgelehnt: 'ablehnen' }[letzte.vorher] || 'zurueckholen';
+  entscheiden(letzte.ids, zurueck, null);
+}
+
+function rasterFreigeben () {
+  const ids = rasterVorrat.filter(b => !raus.has(b.id)).map(b => b.id);
+  if (!ids.length) { melden('Nichts ausgewählt.'); return; }
+  entscheiden(ids, 'freigeben', 'neu');
+}
+
+function rasterSpaeter () {
+  const ids = [...raus];
+  if (!ids.length) { melden('Keine herausgenommen.'); return; }
+  entscheiden(ids, 'zurueckstellen', 'neu');
+}
+
+async function schalten (name) {
+  const wert = !stand.schalter[name];
+  if (name === 'autoFreigabe' && wert && !confirm('Auto-Freigabe wieder einschalten? Saubere Botschaften gehen dann ohne Moderation an die Fassade.')) return;
+  const antwort = await fetch('/api/moderation/schalter', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name, wert })
+  });
+  const d = await antwort.json();
+  stand.schalter = d.schalter;
+  zahlenZeichnen();
+  melden(name === 'autoFreigabe'
+    ? 'Auto-Freigabe ' + (wert ? 'an — saubere Botschaften gehen ohne Moderation durch' : 'aus — alles geht durch die Moderation')
+    : 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'));
+}
+
+async function leeren () {
+  const wort = el('leerenWort').value.trim();
+  const antwort = await fetch('/api/moderation/datenbank-leeren', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ bestaetigung: wort })
+  });
+  const d = await antwort.json();
+  el('leerenStand').textContent = antwort.ok ? d.geloescht + ' Botschaften gelöscht.' : (d.fehler || 'Nicht möglich.');
+  if (antwort.ok) { el('leerenWort').value = ''; vorrat = []; rasterVorrat = []; listenVorrat = []; zahlenHolen(); }
+}
+
+let hinweisUhr = null;
+function melden (text) {
+  const h = el('hinweis');
+  h.textContent = text;
+  h.classList.add('da');
+  clearTimeout(hinweisUhr);
+  hinweisUhr = setTimeout(() => h.classList.remove('da'), 2600);
+}
+
+function taste (e) {
+  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.key.toLowerCase();
+  if (t === 'e') return wechseln('einzeln');
+  if (t === 'r') return wechseln('raster');
+  if (t === 'u') { e.preventDefault(); return rueckgaengig(); }
+  if (ansicht === 'einzeln') {
+    const item = vorrat[0];
+    if (!item) return;
+    if (t === '1' || t === 'f') { e.preventDefault(); entscheiden([item.id], 'freigeben', 'neu'); }
+    if (t === '2' || t === 'a') { e.preventDefault(); entscheiden([item.id], 'ablehnen', 'neu'); }
+    if (t === '3' || t === 'z') { e.preventDefault(); entscheiden([item.id], 'zurueckstellen', 'neu'); }
+  } else if (ansicht === 'raster') {
+    if (t === '1' || t === 'f' || e.key === 'Enter') { e.preventDefault(); rasterFreigeben(); }
+    if (t === '3' || t === 'z') { e.preventDefault(); rasterSpaeter(); }
+  }
+}
+</script>
+</body>
+</html>

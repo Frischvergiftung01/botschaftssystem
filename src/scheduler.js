@@ -10,11 +10,17 @@
 // 2. Die Flächen wechseln *versetzt*. Alle 33 gleichzeitig umzuschalten sähe aus
 //    wie ein Bildschirmwechsel; einzeln wechselnd wirkt die Fassade lebendig.
 //    Jede Fläche hat dafür ihren eigenen Zeitversatz.
+//
+// Seit Block 5 kann die Moderation eingreifen: `entfernen` nimmt eine Botschaft
+// sofort von der Fassade (Ablehnen oder Sperren einer laufenden Botschaft), und
+// der Schalter `nachschub` hält die Zuteilung an, ohne den Dienst zu stoppen.
+// Der harte Abbruch ist das nicht — der passiert in Resolume an den Ebenen.
 
 const cfg = require('./config');
 const { FLAECHEN } = require('./flaechen');
 const { groesseFuer } = require('./text');
 const { abfragen } = require('./db');
+const einstellungen = require('./einstellungen');
 
 // Laufender Zustand je Fläche — das ist genau das, was Simulator und Bridge lesen.
 const zustand = new Map();
@@ -41,6 +47,7 @@ function jetzt () { return Date.now(); }
 
 /** Eine Runde: jede abgelaufene Fläche bekommt eine neue Botschaft. */
 function takt () {
+  if (!einstellungen.schalter().nachschub) return; // angehalten: Laufendes läuft aus
   const t = jetzt();
   // Nie zwei Wechsel im selben Augenblick — sonst flackert die halbe Fassade auf einmal.
   const mindestabstand = Math.max(200, Math.round((cfg.standzeitSekunden * 1000) / FLAECHEN.length / 2));
@@ -83,6 +90,37 @@ function belegen (f, t) {
   return false;
 }
 
+/**
+ * Nimmt Botschaften sofort von der Fassade — für Ablehnen und Sperren aus der
+ * Moderation. Die Fläche wird frei und bekommt im nächsten Takt eine andere.
+ * @param {Iterable<number>} ids
+ * @returns {number} Anzahl geräumter Flächen
+ */
+function entfernen (ids) {
+  const menge = new Set([...ids].map(Number));
+  let geraeumt = 0;
+  for (const f of zustand.values()) {
+    if (f.botschaftId === null || !menge.has(f.botschaftId)) continue;
+    raeumen(f);
+    geraeumt++;
+  }
+  return geraeumt;
+}
+
+/** Alle Flächen räumen — nach dem Leeren der Datenbank. */
+function alleEntfernen () {
+  for (const f of zustand.values()) raeumen(f);
+}
+
+function raeumen (f) {
+  f.botschaftId = null;
+  f.text = '';
+  f.absender = null;
+  f.start = 0;
+  f.ende = 0;
+  f.groesse = null;
+}
+
 /** Botschaft plus Absender, so wie es auf der Fassade steht. */
 function vollerText (b) {
   return b.name ? `${b.text} — ${b.name}` : b.text;
@@ -111,4 +149,4 @@ function anzeige () {
   }));
 }
 
-module.exports = { starten, takt, anzeige, zustand, vollerText };
+module.exports = { starten, takt, anzeige, zustand, vollerText, entfernen, alleEntfernen };
