@@ -132,7 +132,8 @@ Der Engpass des Abends ist nicht die Fassade, sondern dieser Bildschirm: **500 E
 Stunde** muss eine Person schaffen. Die Oberfläche ist darauf gebaut.
 
 - **Einzeln** — eine Botschaft groß in Projektionsoptik, drei Knöpfe, Auto-Advance.
-  Tasten: `1`/`F` freigeben, `2`/`A` ablehnen, `3`/`Z` zurückstellen, `U` rückgängig.
+  Tasten: `1`/`F` freigeben, `2`/`A` ablehnen, `3`/`Z` zurückstellen, `U` rückgängig, `N` neu laden;
+  Ansichten `E` `R` `T` `P` `X`. Jede Taste steht auf dem Knopf, zu dem sie gehört.
   Grenzfälle des Filters stehen vorn und sind rot umrandet, mit dem Grund daneben.
 - **Raster** — zwölf unauffällige Botschaften auf einmal, Anklicken nimmt eine heraus,
   ein Knopf gibt die übrigen frei. Das ist der Durchsatzhebel.

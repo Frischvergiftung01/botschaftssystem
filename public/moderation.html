@@ -107,9 +107,9 @@
 <nav>
   <button data-ansicht="einzeln" class="aktiv">Einzeln<kbd>E</kbd></button>
   <button data-ansicht="raster">Raster<kbd>R</kbd></button>
-  <button data-ansicht="zurueckgestellt">Zurückgestellt</button>
-  <button data-ansicht="pool">Auf der Fassade</button>
-  <button data-ansicht="abgelehnt">Abgelehnt</button>
+  <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
+  <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
+  <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
   <button data-ansicht="werkzeuge">Werkzeuge</button>
 </nav>
 
@@ -120,8 +120,8 @@
     <div class="kacheln" id="kacheln"></div>
     <div class="leiste">
       <button class="pille" id="rasterFreigeben" style="background:var(--gut);color:#04240f;border:0;padding:12px 18px;font-size:.95rem;font-weight:650">Übrige freigeben <kbd>F</kbd></button>
-      <button class="pille" id="rasterSpaeter">Herausgenommene zurückstellen</button>
-      <button class="pille" id="rasterNeu">Neu laden</button>
+      <button class="pille" id="rasterSpaeter">Herausgenommene zurückstellen <kbd>3</kbd></button>
+      <button class="pille" id="rasterNeu">Neu laden <kbd>N</kbd></button>
       <span class="fuss" id="rasterStand"></span>
     </div>
   </section>
@@ -148,8 +148,13 @@
     </div>
     <div class="karte" style="margin-top:14px">
       <h2>Tastatur</h2>
-      <p class="fuss"><b>1</b> oder <b>F</b> freigeben · <b>2</b> oder <b>A</b> ablehnen ·
-      <b>3</b> oder <b>Z</b> zurückstellen · <b>U</b> rückgängig · <b>E</b> einzeln · <b>R</b> Raster.
+      <p class="fuss">Jede Taste steht auch auf dem Knopf, zu dem sie gehört.<br>
+      <b>1</b>/<b>F</b> freigeben · <b>2</b>/<b>A</b> ablehnen · <b>3</b>/<b>Z</b> zurückstellen ·
+      <b>U</b> rückgängig · <b>N</b> neu laden<br>
+      Ansichten: <b>E</b> einzeln · <b>R</b> Raster · <b>T</b> zurückgestellt · <b>P</b> auf der Fassade ·
+      <b>X</b> abgelehnt<br>
+      Im Raster gibt <b>F</b> die übrigen Kacheln frei, <b>3</b> stellt die herausgenommenen zurück.
+      In den Listenansichten wird je Zeile geklickt — dafür gibt es keine Taste.
       Nach jeder Entscheidung rückt die nächste Botschaft nach.</p>
     </div>
   </section>
@@ -491,6 +496,10 @@ function taste (e) {
   const t = e.key.toLowerCase();
   if (t === 'e') return wechseln('einzeln');
   if (t === 'r') return wechseln('raster');
+  if (t === 't') return wechseln('zurueckgestellt');
+  if (t === 'p') return wechseln('pool');
+  if (t === 'x') return wechseln('abgelehnt');
+  if (t === 'n') { e.preventDefault(); return laden(true); }
   if (t === 'u') { e.preventDefault(); return rueckgaengig(); }
   if (ansicht === 'einzeln') {
     const item = vorrat[0];
