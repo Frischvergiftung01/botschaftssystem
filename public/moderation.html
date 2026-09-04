@@ -95,6 +95,8 @@
   /* Nebenseiten laufen in einem Rahmen unter der Moderation — wer den Simulator
      aufmacht, verliert seine Warteschlange nicht. */
   #rahmen{background:var(--grund);display:flex;flex-direction:column;flex:1;min-height:0}
+  /* Der Simulator laeuft mit: er steht unter der Moderation, statt sie zu ersetzen. */
+  #rahmen.unten{flex:0 0 auto;height:46vh;min-height:300px;border-top:1px solid var(--rand)}
   #rahmenkopf{display:flex;gap:12px;align-items:center;padding:8px 16px;
     border-bottom:1px solid var(--rand);font-size:.85rem;color:var(--leise)}
   #rahmenkopf b{color:var(--text);font-weight:600}
@@ -125,13 +127,13 @@
 
 <div class="seiten">
   <a href="#moderation" id="zurModeration" class="offen">Moderation</a><span>·</span>
+  <a href="/simulator" data-modus="unten">Simulator</a><span>·</span>
   <a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span>
-  <a href="/" target="_blank" rel="noopener">Eingabeseite</a><span>·</span>
-  <a href="/simulator" target="_blank" rel="noopener">Simulator</a><span>·</span>
-  <a href="/status" target="_blank" rel="noopener">Statusseite</a><span>·</span>
-  <a href="/api/kennzahlen" target="_blank" rel="noopener">Kennzahlen</a><span>·</span>
-  <a href="/api/anzeige" target="_blank" rel="noopener">Anzeige (roh)</a><span>·</span>
-  <a href="/api/gesundheit" target="_blank" rel="noopener">Gesundheit</a>
+  <a href="/">Eingabeseite</a><span>·</span>
+  <a href="/status">Statusseite</a><span>·</span>
+  <a href="/api/kennzahlen">Kennzahlen</a><span>·</span>
+  <a href="/api/anzeige">Anzeige (roh)</a><span>·</span>
+  <a href="/api/gesundheit">Gesundheit</a>
 </div>
 
 <nav>
@@ -196,7 +198,7 @@
     <span class="rechts">
       <a class="pille" id="rahmenNeu" href="#">Neu laden</a>
       <a class="pille" id="rahmenExtern" target="_blank" rel="noopener" href="#">In neuem Tab</a>
-      <button class="pille" id="rahmenZu">Zurück zur Moderation <kbd>Esc</kbd></button>
+      <button class="pille" id="rahmenZu">Schließen <kbd>Esc</kbd></button>
     </span>
   </div>
   <iframe id="rahmenInhalt" title="Nebenseite"></iframe>
@@ -225,7 +227,7 @@ async function start () {
       e.preventDefault();
       const ziel = a.getAttribute('href');
       if (ziel === '#moderation') return rahmenZu();
-      rahmenAuf(ziel, a.textContent.trim(), a);
+      rahmenAuf(ziel, a.textContent.trim(), a, a.dataset.modus === 'unten');
     }));
   el('rahmenZu').addEventListener('click', rahmenZu);
   el('rahmenNeu').addEventListener('click', e => {
@@ -298,7 +300,7 @@ function zahlenZeichnen () {
 // ---------------------------------------------------------------- Zeichnen
 
 function wechseln (neu) {
-  if (!el('rahmen').hidden) rahmenZu();
+  if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
   ansicht = neu;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
   for (const s of ['einzeln', 'raster', 'liste', 'werkzeuge']) {
@@ -541,20 +543,25 @@ async function leeren () {
 
 // Die Nebenseite tritt an die Stelle der Moderation, statt unter ihr zu stehen —
 // die Warteschlange bleibt dabei im Speicher und ist nach "Zurück" sofort da.
-function rahmenAuf (adresse, titel, verweis) {
+function rahmenAuf (adresse, titel, verweis, unten) {
   el('rahmenTitel').textContent = titel;
   el('rahmenExtern').href = adresse;
   el('rahmenInhalt').src = adresse;
   el('rahmen').hidden = false;
-  document.querySelector('main').hidden = true;
-  document.querySelector('nav').hidden = true;
+  el('rahmen').classList.toggle('unten', Boolean(unten));
+  // "unten" heißt mitlaufen: die Moderation bleibt sichtbar. Alles andere
+  // tritt an ihre Stelle, sonst sucht man zwei Oberflächen gleichzeitig ab.
+  document.querySelector('main').hidden = !unten;
+  document.querySelector('nav').hidden = !unten;
   document.querySelectorAll('.seiten a').forEach(a => a.classList.remove('offen'));
   if (verweis) verweis.classList.add('offen');
+  if (unten) el('zurModeration').classList.add('offen');
   window.scrollTo({ top: 0 });
 }
 
 function rahmenZu () {
   el('rahmen').hidden = true;
+  el('rahmen').classList.remove('unten');
   el('rahmenInhalt').src = 'about:blank';
   document.querySelector('main').hidden = false;
   document.querySelector('nav').hidden = false;
