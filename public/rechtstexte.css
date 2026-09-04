@@ -1,0 +1,14 @@
+:root{--grund:#0d0f14;--feld:#171b23;--rand:#2a3040;--text:#f2f4f8;--leise:#98a1b3;--gold:#ffcf6b}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--grund);color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.6}
+body{max-width:640px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:1.4rem;margin:0 0 4px}
+h2{font-size:1rem;margin:26px 0 6px}
+p,li{font-size:.95rem}
+p{margin:0 0 10px}
+ul{margin:0 0 10px;padding-left:20px}
+a{color:var(--gold)}
+.leise{color:var(--leise);font-size:.85rem}
+.karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;padding:14px;margin:14px 0}
+footer{margin-top:36px;border-top:1px solid var(--rand);padding-top:14px}
