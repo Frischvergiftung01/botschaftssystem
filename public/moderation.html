@@ -33,6 +33,7 @@
     font-size:.82rem;color:var(--leise)}
   .seiten a{color:var(--gold);text-decoration:none}
   .seiten a:hover{text-decoration:underline}
+  .seiten a.offen{color:var(--text);text-decoration:underline}
   .seiten span{color:#4a5468}
   nav{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--rand);overflow-x:auto}
   nav button{background:none;border:0;color:var(--leise);font:inherit;font-size:.9rem;
@@ -93,8 +94,7 @@
 
   /* Nebenseiten laufen in einem Rahmen unter der Moderation — wer den Simulator
      aufmacht, verliert seine Warteschlange nicht. */
-  #rahmen{border-top:1px solid var(--rand);background:var(--grund);
-    display:flex;flex-direction:column;height:70vh;min-height:360px}
+  #rahmen{background:var(--grund);display:flex;flex-direction:column;flex:1;min-height:0}
   #rahmenkopf{display:flex;gap:12px;align-items:center;padding:8px 16px;
     border-bottom:1px solid var(--rand);font-size:.85rem;color:var(--leise)}
   #rahmenkopf b{color:var(--text);font-weight:600}
@@ -124,6 +124,7 @@
 </header>
 
 <div class="seiten">
+  <a href="#moderation" id="zurModeration" class="offen">Moderation</a><span>·</span>
   <a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span>
   <a href="/" target="_blank" rel="noopener">Eingabeseite</a><span>·</span>
   <a href="/simulator" target="_blank" rel="noopener">Simulator</a><span>·</span>
@@ -220,7 +221,12 @@ async function start () {
   document.querySelectorAll('nav button').forEach(b =>
     b.addEventListener('click', () => wechseln(b.dataset.ansicht)));
   document.querySelectorAll('.seiten a').forEach(a =>
-    a.addEventListener('click', e => { e.preventDefault(); rahmenAuf(a.getAttribute('href'), a.textContent.trim()); }));
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      const ziel = a.getAttribute('href');
+      if (ziel === '#moderation') return rahmenZu();
+      rahmenAuf(ziel, a.textContent.trim(), a);
+    }));
   el('rahmenZu').addEventListener('click', rahmenZu);
   el('rahmenNeu').addEventListener('click', e => {
     e.preventDefault();
@@ -533,18 +539,27 @@ async function leeren () {
 
 // ---------------------------------------------------------------- Nebenseiten
 
-function rahmenAuf (adresse, titel) {
+// Die Nebenseite tritt an die Stelle der Moderation, statt unter ihr zu stehen —
+// die Warteschlange bleibt dabei im Speicher und ist nach "Zurück" sofort da.
+function rahmenAuf (adresse, titel, verweis) {
   el('rahmenTitel').textContent = titel;
   el('rahmenExtern').href = adresse;
   el('rahmenInhalt').src = adresse;
   el('rahmen').hidden = false;
-  el('rahmen').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.querySelector('main').hidden = true;
+  document.querySelector('nav').hidden = true;
+  document.querySelectorAll('.seiten a').forEach(a => a.classList.remove('offen'));
+  if (verweis) verweis.classList.add('offen');
+  window.scrollTo({ top: 0 });
 }
 
 function rahmenZu () {
   el('rahmen').hidden = true;
   el('rahmenInhalt').src = 'about:blank';
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  document.querySelector('main').hidden = false;
+  document.querySelector('nav').hidden = false;
+  document.querySelectorAll('.seiten a').forEach(a => a.classList.remove('offen'));
+  el('zurModeration').classList.add('offen');
   window.focus();   // damit die Tastenkürzel wieder greifen
 }
 
