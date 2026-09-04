@@ -95,6 +95,13 @@ function pruefen (text, name = '') {
 
   for (const grund of spamverdacht(n)) gruende.push(grund);
 
+  const woerter = n.woerter.filter(t => /[a-z]/.test(t));
+  const unsinnige = woerter.filter(unsinnigesWort);
+  if (unsinnige.length) {
+    const alles = unsinnige.length === woerter.length;
+    gruende.push({ regel: 'unsinn', rang: alles ? 'hart' : 'weich', treffer: unsinnige[0] });
+  }
+
   const urteil = gruende.some(g => g.rang === 'hart') ? 'ABLEHNEN'
     : gruende.length ? 'PRUEFEN'
       : 'FREI';
@@ -102,7 +109,47 @@ function pruefen (text, name = '') {
   return { urteil, stufe: '1a', gruende };
 }
 
-// Richtlinie 4.9 — Spam und Unsinn. Nur Verdacht, nie Ablehnung: bei einem
+// Richtlinie 4.9 — offensichtlicher Tastatursalat. Die einzige Stelle, an der
+// Unsinn direkt abgelehnt wird, und deshalb bewusst eng: nur ein Wort, das
+// entweder eine Tastaturreihe abläuft (asdfgh, qwertz) oder dieselbe Silbe
+// mindestens dreimal wiederholt (asdasdasd). Lachen und Ausrufe sind
+// ausgenommen, sonst fiele "hahahaha" darunter. Abgelehnt wird nur, wenn die
+// GANZE Botschaft so aussieht; ein einzelnes seltsames Wort in einem Satz
+// bleibt ein Fall für die Moderation.
+const TASTATURREIHEN = ['qwertzuiop', 'qwertyuiop', 'asdfghjkl', 'yxcvbnm', 'zxcvbnm', '1234567890'];
+const AUSRUFE = new Set(['ha', 'he', 'hi', 'ho', 'hu', 'ja', 'na', 'la', 'le', 'lo', 'oh', 'ah', 'juh', 'tra']);
+
+function tastaturmuster (wort) {
+  for (const reihe of TASTATURREIHEN) {
+    for (let i = 0; i + 5 <= wort.length; i++) {
+      const teil = wort.slice(i, i + 5);
+      if (reihe.includes(teil) || reihe.includes([...teil].reverse().join(''))) return true;
+    }
+  }
+  return false;
+}
+
+function unsinnigesWort (wort) {
+  if (wort.length < 6) return false;
+  // Gedehntes zuerst aussortieren: "ohhhh", "neeee", "juhuuuu" sind keine
+  // Tastatursalate, sondern Freude.
+  const kern = wort.replace(/(.)\1+/g, '$1');
+  if (kern.length <= 4) return false;
+  if (tastaturmuster(wort)) return true;
+
+  const silbe = wort.match(/^(.{2,4})\1{2,}$/);
+  if (silbe) return !AUSRUFE.has(silbe[1]);
+
+  // Wenig verschiedene Buchstaben auf viel Länge — "asdaffafafaf". Lachen und
+  // Ausrufe sind ausgenommen, die bestehen aus derselben Silbe.
+  if (wort.length >= 8 && new Set(wort).size <= 4) {
+    const wiederholt = wort.match(/^(.{2,3})\1+$/);
+    return !(wiederholt && AUSRUFE.has(wiederholt[1]));
+  }
+  return false;
+}
+
+// Richtlinie 4.9 — Spam. Sonst nur Verdacht, nie Ablehnung: bei einem
 // Fehlalarm soll ein Mensch draufschauen, nicht die Maschine entscheiden.
 function spamverdacht (n) {
   const gruende = [];
@@ -127,4 +174,4 @@ function spamverdacht (n) {
   return gruende;
 }
 
-module.exports = { pruefen, nichtDarstellbar, spamverdacht };
+module.exports = { pruefen, nichtDarstellbar, spamverdacht, unsinnigesWort };

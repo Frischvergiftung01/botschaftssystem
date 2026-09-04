@@ -38,6 +38,13 @@ const FAELLE = [
   ['Danke an Mercedes',                   'PRUEFEN',  '4.6 Marke'],
   ['88',                                  'PRUEFEN',  '4.3 Code, aber auch Jahrgang'],
   ['aaaa aaaa aaaa aaaa',                 'PRUEFEN',  '4.9 Spam'],
+  ['asdasdasd und liebe Grüße',            'PRUEFEN',  '4.9 ein Wort Salat, der Rest echt'],
+
+  ['asdasdasd',                            'ABLEHNEN', '4.9 Tastatursalat'],
+  ['qwertzuiop',                           'ABLEHNEN', '4.9 Tastaturreihe'],
+  ['asdaffafafaf',                         'ABLEHNEN', '4.9 vier Buchstaben auf zwölf Zeichen'],
+  ['Hahahaha',                             'FREI',     '4.9 Lachen ist kein Salat'],
+  ['Ohhhhhh',                              'FREI',     '4.9 Dehnung ist kein Salat'],
 
   ['Beste Pizza bei Luigi, www.luigi.de', 'ABLEHNEN', '4.8 Adresse'],
   ['Schreib mir: post@example.de',        'ABLEHNEN', '4.8 Mail'],
