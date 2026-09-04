@@ -59,10 +59,15 @@ fastify.post('/api/botschaft', async (req, reply) => {
     return reply.code(400).send({ fehler: `Diese Zeichen können wir auf der Fassade nicht darstellen: ${fremd.join(' ')}` });
   }
 
+  // Wer an der Moderation angemeldet ist, sendet vom Haus aus: keine Gerätesperre
+  // und das Filterergebnis kommt mit zurück. Das ist die Testseite
+  // /moderation/eingabe und am Abend der Weg für eigene Botschaften.
+  const vomPlatz = auth.angemeldet(req);
+
   // Spam-Sperre je Gerät. Die Kennung kommt vom Browser und wird nur gehasht
   // gespeichert — wir wollen wissen "schon wieder dasselbe Gerät", nicht "wer".
   const geraet = hash(String(req.body?.geraet ?? req.ip));
-  const letzte = abfragen.letzteVomGeraet.get(geraet);
+  const letzte = vomPlatz ? null : abfragen.letzteVomGeraet.get(geraet);
   if (letzte && Date.now() - letzte.erstellt_am < cfg.sperreProGeraetSekunden * 1000) {
     const wart = Math.ceil((cfg.sperreProGeraetSekunden * 1000 - (Date.now() - letzte.erstellt_am)) / 1000);
     return reply.code(429).send({ fehler: `Kurz durchatmen — in ${wart} Sekunden geht die nächste.`, wartenSekunden: wart });
@@ -100,7 +105,7 @@ fastify.post('/api/botschaft', async (req, reply) => {
   // ihn umschreiben.
   if (status === 'abgelehnt') {
     req.log.info({ id: info.lastInsertRowid, pruefung }, 'Botschaft abgelehnt');
-    return reply.code(422).send({ fehler: cfg.textAblehnung });
+    return reply.code(422).send({ fehler: cfg.textAblehnung, ...(vomPlatz ? { pruefung } : {}) });
   }
 
   const voll = name ? `${text} — ${name}` : text;
@@ -108,7 +113,8 @@ fastify.post('/api/botschaft', async (req, reply) => {
   // Die Sperrzeit geht mit zurueck: die Seiten zeigen daraus den Countdown und
   // halten den Knopf "noch eine Botschaft" so lange geschlossen.
   return { token, id: info.lastInsertRowid, status, passendeFlaechen: passend.length,
-    sperreSekunden: cfg.sperreProGeraetSekunden };
+    sperreSekunden: vomPlatz ? 0 : cfg.sperreProGeraetSekunden,
+    ...(vomPlatz ? { pruefung } : {}) };
 });
 
 // ---------------------------------------------------------------- Status je Absender
@@ -239,6 +245,7 @@ fastify.get('/', (req, reply) => reply.sendFile('index.html'));
 fastify.get('/status', (req, reply) => reply.sendFile('status.html'));
 fastify.get('/simulator', (req, reply) => reply.sendFile('simulator.html'));
 fastify.get('/moderation', (req, reply) => reply.sendFile('moderation.html'));
+fastify.get('/moderation/eingabe', (req, reply) => reply.sendFile('moderation-eingabe.html'));
 fastify.get('/moderation/anmelden', (req, reply) => {
   if (auth.angemeldet(req)) return reply.redirect('/moderation');
   return reply.sendFile('anmeldung.html');

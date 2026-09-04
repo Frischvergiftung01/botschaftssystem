@@ -28,6 +28,11 @@
   .pille.an{border-color:var(--gut);color:var(--gut)}
   .pille.aus{border-color:var(--warn);color:var(--warn)}
 
+  .seiten{display:flex;gap:14px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--rand);
+    font-size:.82rem;color:var(--leise)}
+  .seiten a{color:var(--gold);text-decoration:none}
+  .seiten a:hover{text-decoration:underline}
+  .seiten span{color:#4a5468}
   nav{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--rand);overflow-x:auto}
   nav button{background:none;border:0;color:var(--leise);font:inherit;font-size:.9rem;
     padding:8px 12px;border-radius:10px;cursor:pointer;white-space:nowrap}
@@ -106,6 +111,16 @@
     <button class="pille" id="abmelden">Abmelden</button>
   </div>
 </header>
+
+<div class="seiten">
+  <a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span>
+  <a href="/" target="_blank" rel="noopener">Eingabeseite</a><span>·</span>
+  <a href="/simulator" target="_blank" rel="noopener">Simulator</a><span>·</span>
+  <a href="/status" target="_blank" rel="noopener">Statusseite</a><span>·</span>
+  <a href="/api/kennzahlen" target="_blank" rel="noopener">Kennzahlen</a><span>·</span>
+  <a href="/api/anzeige" target="_blank" rel="noopener">Anzeige (roh)</a><span>·</span>
+  <a href="/api/gesundheit" target="_blank" rel="noopener">Gesundheit</a>
+</div>
 
 <nav>
   <button data-ansicht="einzeln" class="aktiv">Einzeln<kbd>E</kbd></button>

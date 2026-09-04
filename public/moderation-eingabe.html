@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Botschaft einstellen — Moderationsplatz</title>
+<link rel="stylesheet" href="/schrift/schrift.css">
+<style>
+  :root{--grund:#0b0d12;--feld:#151922;--rand:#242c3a;--text:#f2f4f8;--leise:#98a1b3;
+    --gold:#ffcf6b;--gut:#5fd08a;--warn:#ff7a6b;--vertagt:#8fb6ff}
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--grund);color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:16px}
+  header{width:100%;max-width:640px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap}
+  h1{font-size:1rem;margin:0;font-weight:650}
+  header .leise{color:var(--leise);font-size:.85rem}
+  header a{color:var(--gold);text-decoration:none;font-size:.85rem;margin-left:auto}
+  form,.karte{width:100%;max-width:640px}
+  .karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;padding:12px}
+  textarea,input{width:100%;background:var(--feld);color:var(--text);border:1px solid var(--rand);
+    border-radius:12px;padding:12px;font:inherit;font-size:1.02rem;resize:none}
+  textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
+  .reihe{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .reihe input{flex:1;min-width:160px}
+  button{background:var(--gold);color:#1a1206;border:0;border-radius:12px;padding:13px 20px;
+    font:inherit;font-size:1rem;font-weight:650;cursor:pointer}
+  button:disabled{opacity:.45;cursor:default}
+  .buehne{position:relative;background:#000;border:1px solid var(--rand);border-radius:4px;
+    overflow:hidden;width:100%;margin-bottom:10px}
+  .buehne span{position:absolute;white-space:nowrap;color:#fff;line-height:1;
+    font-family:Oswald,"Arial Narrow",sans-serif}
+  .urteil{font-weight:650}
+  .FREI{color:var(--gut)} .PRUEFEN{color:var(--vertagt)} .ABLEHNEN{color:var(--warn)}
+  .zeile{color:var(--leise);font-size:.85rem;margin-top:6px;line-height:1.5}
+  .zeile b{color:var(--text);font-weight:600}
+  .protokoll{width:100%;max-width:640px;display:flex;flex-direction:column;gap:10px}
+  .fuss{color:#6b748b;font-size:.8rem;max-width:640px;line-height:1.5}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Botschaft einstellen</h1>
+  <span class="leise">Moderationsplatz — keine Wartezeit, Filterergebnis sichtbar</span>
+  <a href="/moderation">zur Moderation</a>
+</header>
+
+<form id="formular" autocomplete="off">
+  <textarea id="text" rows="2" maxlength="120" placeholder="Botschaft" autofocus></textarea>
+  <div class="reihe">
+    <input id="name" maxlength="15" placeholder="Vorname (optional)">
+    <button id="senden" type="submit">Abschicken</button>
+  </div>
+</form>
+
+<div class="protokoll" id="protokoll"></div>
+
+<p class="fuss">Botschaften von hier gehen durch dieselbe Filterkette wie die vom Publikum —
+nur ohne die 120-Sekunden-Sperre. Angezeigt wird, was die beiden Stufen geurteilt haben.</p>
+
+<script>
+const BANDHOEHE = 44, VERSAL_ANTEIL = 0.81;
+const el = id => document.getElementById(id);
+const text = el('text'), name = el('name'), senden = el('senden'), protokoll = el('protokoll');
+let flaechen = [];
+
+fetch('/api/flaechen').then(a => a.json()).then(f => { flaechen = f; }).catch(() => {});
+
+el('formular').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const voll = name.value.trim() ? `${text.value.trim()} — ${name.value.trim()}` : text.value.trim();
+  if (voll.length < 2) return;
+  senden.disabled = true;
+  try {
+    const antwort = await fetch('/api/botschaft', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: text.value, name: name.value, geraet: 'moderationsplatz' })
+    });
+    if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+    eintragen(voll, antwort.status, await antwort.json());
+    text.value = ''; name.value = ''; text.focus();
+  } catch (err) {
+    eintragen(voll, 0, { fehler: 'Keine Verbindung.' });
+  }
+  senden.disabled = false;
+});
+
+function eintragen (voll, code, d) {
+  const k = document.createElement('div');
+  k.className = 'karte';
+
+  const buehne = document.createElement('div');
+  buehne.className = 'buehne';
+  buehne.appendChild(document.createElement('span'));
+  k.appendChild(buehne);
+
+  const p = d.pruefung || {};
+  const urteil = p.urteil || (code === 400 ? 'ANZEIGE' : code === 429 ? 'GESPERRT' : '—');
+  const stufe1a = p.stufe1a ? p.stufe1a.urteil : '—';
+  const stufe1b = p.stufe1b ? (p.stufe1b.urteil || 'Ausfall') : (p.stufe1b === null ? 'übersprungen' : '—');
+  const grund1b = p.stufe1b && p.stufe1b.grund ? ` (${p.stufe1b.grund})` : '';
+  const gruende = (p.stufe1a && p.stufe1a.gruende || []).map(g => `${g.regel}:${g.treffer}`).join(' · ');
+
+  const kopf = document.createElement('div');
+  kopf.innerHTML = `<span class="urteil ${urteil}">${urteil}</span> ` +
+    `<span class="zeile" style="display:inline">HTTP ${code}` +
+    (d.status ? ` · Status <b>${d.status}</b>` : '') +
+    (d.fehler ? ` · ${d.fehler}` : '') + '</span>';
+  k.appendChild(kopf);
+
+  const details = document.createElement('div');
+  details.className = 'zeile';
+  details.innerHTML = `Stufe 1a <b>${stufe1a}</b>${gruende ? ' — ' + gruende : ''} · ` +
+    `Stufe 1b <b>${stufe1b}</b>${grund1b}` +
+    (d.passendeFlaechen !== undefined ? ` · passt auf <b>${d.passendeFlaechen}</b> von 33 Flächen` : '') +
+    (d.token ? ` · <a href="/status?t=${encodeURIComponent(d.token)}" style="color:var(--gold)">Status</a>` : '');
+  k.appendChild(details);
+
+  protokoll.prepend(k);
+  malen(buehne, voll);
+  while (protokoll.children.length > 12) protokoll.lastChild.remove();
+}
+
+// Vorschau auf der schmalsten Fläche, auf der die Botschaft noch lesbar wäre —
+// dieselbe Sicht wie in der Moderation.
+function malen (buehne, voll) {
+  const messer = document.createElement('canvas').getContext('2d');
+  messer.font = '100px Oswald, "Arial Narrow", sans-serif';
+  const breite100 = messer.measureText(voll).width || 1;
+  const breiten = (flaechen.length ? flaechen.map(f => f.breite) : [437]).slice().sort((a, b) => a - b);
+  let gewaehlt = breiten[breiten.length - 1], versal = 0;
+  for (const b of breiten) {
+    const em = Math.min(100 * ((b - 4) / breite100), 40 / VERSAL_ANTEIL);
+    if (em * VERSAL_ANTEIL >= 22) { gewaehlt = b; versal = em * VERSAL_ANTEIL; break; }
+  }
+  if (!versal) {
+    const em = Math.min(100 * ((gewaehlt - 4) / breite100), 40 / VERSAL_ANTEIL);
+    versal = em * VERSAL_ANTEIL;
+  }
+  const skala = buehne.clientWidth / gewaehlt;
+  buehne.style.height = (BANDHOEHE * skala) + 'px';
+  const em = versal / VERSAL_ANTEIL;
+  const span = buehne.firstChild;
+  span.textContent = voll;
+  span.style.fontSize = (em * skala) + 'px';
+  span.style.top = ((BANDHOEHE / 2 + 0.452 * em - 0.952 * em) * skala) + 'px';
+  span.style.left = (2 * skala) + 'px';
+}
+</script>
+</body>
+</html>

@@ -10,6 +10,7 @@ process.env.DB_PFAD = '/tmp/sperre-test.db';
 process.env.SPERRE_SEKUNDEN = '120';
 process.env.MISTRAL_API_KEY = '';
 process.env.LOG_LEVEL = 'silent';
+process.env.MODERATION_KENNWORT = 'probe-kennwort-2026';
 for (const e of ['', '-wal', '-shm']) fs.rmSync(process.env.DB_PFAD + e, { force: true });
 
 const { fastify } = require('../src/server');
@@ -28,7 +29,23 @@ const senden = (text, geraet) => fastify.inject({ method: 'POST', url: '/api/bot
   const anderes = await senden('Von einem anderen Gerät', 'geraet-b');
   assert.strictEqual(anderes.statusCode, 200, 'Die Sperre gilt je Gerät, nicht für alle');
 
+  // Vom Moderationsplatz (angemeldet) gilt keine Sperre — sonst wäre die
+  // Testseite unbrauchbar und am Abend könnte niemand vom Haus aus einstellen.
+  const an = await fastify.inject({ method: 'POST', url: '/api/moderation/anmelden', payload: { kennwort: 'probe-kennwort-2026' } });
+  const keks = [].concat(an.headers['set-cookie'])[0].split(';')[0];
+  const platz = (text) => fastify.inject({ method: 'POST', url: '/api/botschaft', headers: { cookie: keks }, payload: { text, geraet: 'moderationsplatz' } });
+  const p1 = await platz('Vom Moderationsplatz eins');
+  const p2 = await platz('Vom Moderationsplatz zwei');
+  assert.strictEqual(p1.statusCode, 200);
+  assert.strictEqual(p2.statusCode, 200, 'Am Moderationsplatz darf zweimal hintereinander gesendet werden');
+  assert.ok(p2.json().pruefung, 'Die Testseite braucht das Filterergebnis');
+  assert.strictEqual(p2.json().sperreSekunden, 0);
+  // Für das Publikum bleibt das Ergebnis verschlossen
+  const oeffentlich = await senden('Ohne Anmeldung', 'geraet-c');
+  assert.ok(!oeffentlich.json().pruefung, 'Ohne Anmeldung darf kein Filterergebnis nach draußen');
+
   console.log(`
-  Gerätesperre: 120 s je Gerät, Restzeit (${wart} s) und Sperrdauer kommen an die Seite zurück.`);
+  Gerätesperre: 120 s je Gerät, Restzeit (${wart} s) kommt an die Seite zurück.
+  Moderationsplatz sendet ohne Sperre und sieht das Filterergebnis, das Publikum nicht.`);
   process.exit(0);
 })().catch(e => { console.error(e); process.exit(1); });
