@@ -27,6 +27,8 @@
   @keyframes puls{0%,100%{opacity:1}50%{opacity:.25}}
   a.knopf{display:block;text-align:center;background:transparent;color:var(--gold);
     border:1px solid var(--rand);border-radius:14px;padding:13px;text-decoration:none;font-weight:600}
+  a.knopf.aus{color:var(--leise);pointer-events:none;opacity:.6}
+  .fuss{color:#6b748b;font-size:.8rem;text-align:center;max-width:520px;line-height:1.5;margin:0}
   .balken{height:6px;background:#232a36;border-radius:99px;overflow:hidden;margin-top:12px}
   .balken div{height:100%;background:var(--gold);width:0;transition:width .6s}
 </style>
@@ -44,12 +46,40 @@
   <div class="balken"><div id="balken"></div></div>
 </div>
 
-<a class="knopf" href="/">Noch eine Botschaft schicken</a>
+<a class="knopf" id="weiter" href="/">Noch eine Botschaft schicken</a>
+<p class="fuss">Du kannst die Seite offen lassen — sie hält sich von selbst auf dem Laufenden.
+Wenn du sie schließt, findest du deine Botschaft über die Startseite wieder.</p>
 
 <script>
 const token = new URLSearchParams(location.search).get('t') || localStorage.getItem('token');
 const el = id => document.getElementById(id);
 let timer = null;
+
+// Dieselbe Ablage wie auf der Eingabeseite: eigene Botschaften und die Wartezeit
+// bis zur naechsten. Wer ueber einen Link hier landet, hat sie damit auch dort.
+const LISTE = 'botschaften', SPERRE = 'sperreBis';
+function eigene () { try { return JSON.parse(localStorage.getItem(LISTE) || '[]'); } catch (e) { return []; } }
+if (token && !eigene().some(x => x.token === token)) {
+  const liste = eigene();
+  liste.unshift({ token, text: '', zeit: Date.now() });
+  localStorage.setItem(LISTE, JSON.stringify(liste.slice(0, 10)));
+}
+
+// "Noch eine Botschaft" bleibt zu, solange die Gerätesperre läuft — sonst
+// tippt jemand einen Text und bekommt erst beim Abschicken die Absage.
+const weiter = el('weiter');
+function sperreTicken () {
+  const rest = Math.ceil((Number(localStorage.getItem(SPERRE) || 0) - Date.now()) / 1000);
+  if (rest > 0) {
+    weiter.classList.add('aus');
+    weiter.textContent = `Noch eine Botschaft — in ${Math.floor(rest / 60)}:${String(rest % 60).padStart(2, '0')}`;
+  } else {
+    weiter.classList.remove('aus');
+    weiter.textContent = 'Noch eine Botschaft schicken';
+  }
+}
+setInterval(sperreTicken, 1000);
+sperreTicken();
 
 if (!token) {
   el('ueberschrift').textContent = 'Keine Botschaft gefunden';
@@ -71,6 +101,12 @@ async function laden () {
 
 function zeichnen (d) {
   el('botschaft').textContent = d.text;
+  const liste = eigene();
+  const eintrag = liste.find(x => x.token === token);
+  if (eintrag && !eintrag.text) {
+    eintrag.text = d.name ? `${d.text} — ${d.name}` : d.text;
+    localStorage.setItem(LISTE, JSON.stringify(liste));
+  }
   el('absender').textContent = d.name ? '— ' + d.name : '';
   const karte = el('statuskarte');
   karte.classList.remove('jetzt');

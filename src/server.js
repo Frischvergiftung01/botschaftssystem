@@ -65,7 +65,7 @@ fastify.post('/api/botschaft', async (req, reply) => {
   const letzte = abfragen.letzteVomGeraet.get(geraet);
   if (letzte && Date.now() - letzte.erstellt_am < cfg.sperreProGeraetSekunden * 1000) {
     const wart = Math.ceil((cfg.sperreProGeraetSekunden * 1000 - (Date.now() - letzte.erstellt_am)) / 1000);
-    return reply.code(429).send({ fehler: `Kurz durchatmen — in ${wart} Sekunden geht die nächste.` });
+    return reply.code(429).send({ fehler: `Kurz durchatmen — in ${wart} Sekunden geht die nächste.`, wartenSekunden: wart });
   }
 
   const token = crypto.randomBytes(9).toString('base64url');
@@ -105,7 +105,10 @@ fastify.post('/api/botschaft', async (req, reply) => {
 
   const voll = name ? `${text} — ${name}` : text;
   const passend = passendeFlaechen(voll, FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe);
-  return { token, id: info.lastInsertRowid, status, passendeFlaechen: passend.length };
+  // Die Sperrzeit geht mit zurueck: die Seiten zeigen daraus den Countdown und
+  // halten den Knopf "noch eine Botschaft" so lange geschlossen.
+  return { token, id: info.lastInsertRowid, status, passendeFlaechen: passend.length,
+    sperreSekunden: cfg.sperreProGeraetSekunden };
 });
 
 // ---------------------------------------------------------------- Status je Absender

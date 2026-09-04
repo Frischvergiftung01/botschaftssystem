@@ -11,7 +11,9 @@ module.exports = {
   maxZeichenName: Number(process.env.MAX_ZEICHEN_NAME || 15),
   empfohleneZeichen: Number(process.env.EMPFOHLENE_ZEICHEN || 35), // bis hierhin passt eine Botschaft auf alle 33 Flächen
   nameErlaubt: process.env.NAME_ERLAUBT !== 'false',
-  sperreProGeraetSekunden: Number(process.env.SPERRE_SEKUNDEN || 30),
+  // Wartezeit zwischen zwei Botschaften desselben Geraets. 120 s statt 30:
+  // eine halbe Minute laedt zum Spammen ein (Entscheidung 04.09.2026).
+  sperreProGeraetSekunden: Number(process.env.SPERRE_SEKUNDEN || 120),
 
   // Filterkette (Block 4).
   // Stufe 1a (Wortliste, Regeln) laeuft immer. autoFreigabe entscheidet nur,

@@ -38,6 +38,10 @@
   .fehler{color:var(--warn);font-size:.9rem;min-height:1.2em;margin:0}
   footer{max-width:520px;color:#6b748b;font-size:.78rem;text-align:center;line-height:1.5;margin-top:auto}
   .vorschau{border:1px solid var(--rand);border-radius:14px;padding:10px 12px;background:#0a0c11}
+  .rueckkehr{display:block;width:100%;max-width:520px;text-align:center;color:var(--gold);
+    background:#12161e;border:1px solid var(--rand);border-radius:14px;padding:11px 14px;
+    text-decoration:none;font-size:.9rem}
+  .wartehinweis{color:var(--warn);font-size:.88rem;text-align:center;margin:0}
   .vorschau .titel{font-size:.75rem;color:var(--leise);margin-bottom:8px}
   .vorschau .band{display:block;overflow:hidden;white-space:nowrap;color:#fff;line-height:1;
     font-family:Oswald,"Arial Narrow",system-ui,sans-serif;position:relative}
@@ -48,6 +52,8 @@
   <h1>Schick deine Botschaft an den Königsbau</h1>
   <p class="unterzeile">Sie erscheint im Laufe des Abends auf der Fassade.</p>
 </header>
+
+<a class="rueckkehr" id="rueckkehr" href="/status" hidden></a>
 
 <form id="formular" autocomplete="off">
   <div class="spielregeln">
@@ -79,6 +85,7 @@
 
   <p class="fehler" id="fehler"></p>
   <button id="senden" type="submit">Botschaft abschicken</button>
+  <p class="wartehinweis" id="wartehinweis" hidden></p>
 </form>
 
 <footer>
@@ -141,7 +148,7 @@ function aktualisieren () {
   passtText.textContent = k === alle
     ? `passt auf alle ${alle} Flächen`
     : (k === 0 ? 'zu lang für jede Fläche' : `passt auf ${k} von ${alle} Flächen`);
-  senden.disabled = text.value.trim().length < 2;
+  senden.disabled = text.value.trim().length < 2 || gesperrt();
   // Vorschau auf der schmalsten Fläche, die noch passt — dort landet die Botschaft
   // am ehesten, weil es von den schmalen die meisten gibt.
   vorschau(voll, k > 0 ? Math.min(...passend) : Math.max(...breiten));
@@ -177,6 +184,46 @@ text.addEventListener('input', aktualisieren);
 name.addEventListener('input', aktualisieren);
 aktualisieren();
 
+// Eigene Botschaften und die Wartezeit bleiben im Browser. Damit findet jemand
+// seinen Status wieder, auch wenn er die Seite zwischendurch geschlossen hat —
+// und sieht, wie lange es bis zur nächsten Botschaft noch dauert.
+const LISTE = 'botschaften', SPERRE = 'sperreBis';
+const wartehinweis = document.getElementById('wartehinweis');
+const rueckkehr = document.getElementById('rueckkehr');
+
+function eigene () { try { return JSON.parse(localStorage.getItem(LISTE) || '[]'); } catch (e) { return []; } }
+function merken (token, voll) {
+  const liste = eigene().filter(x => x.token !== token);
+  liste.unshift({ token, text: voll, zeit: Date.now() });
+  localStorage.setItem(LISTE, JSON.stringify(liste.slice(0, 10)));
+}
+const sperreBis = () => Number(localStorage.getItem(SPERRE) || 0);
+const gesperrt = () => sperreBis() > Date.now();
+function restZeit () {
+  const s = Math.max(0, Math.ceil((sperreBis() - Date.now()) / 1000));
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function sperreZeigen () {
+  if (gesperrt()) {
+    wartehinweis.hidden = false;
+    wartehinweis.textContent = `Noch ${restZeit()} bis zur nächsten Botschaft.`;
+    senden.disabled = true;
+  } else if (!wartehinweis.hidden) {
+    wartehinweis.hidden = true;
+    aktualisieren();
+  }
+}
+setInterval(sperreZeigen, 1000);
+sperreZeigen();
+
+const letzte = eigene()[0];
+if (letzte) {
+  rueckkehr.hidden = false;
+  rueckkehr.href = '/status?t=' + encodeURIComponent(letzte.token);
+  const kurz = letzte.text.length > 38 ? letzte.text.slice(0, 38) + '…' : letzte.text;
+  rueckkehr.textContent = `Deine letzte Botschaft ansehen: „${kurz}"`;
+}
+
 document.getElementById('formular').addEventListener('submit', async (e) => {
   e.preventDefault();
   senden.disabled = true; fehler.textContent = '';
@@ -186,7 +233,16 @@ document.getElementById('formular').addEventListener('submit', async (e) => {
       body: JSON.stringify({ text: text.value, name: name.value, geraet })
     });
     const daten = await antwort.json();
-    if (!antwort.ok) { fehler.textContent = daten.fehler || 'Das hat nicht geklappt.'; senden.disabled = false; return; }
+    if (!antwort.ok) {
+      fehler.textContent = daten.fehler || 'Das hat nicht geklappt.';
+      // Bei "zu schnell" weiss der Server, wie lange noch — daraus laeuft der Countdown.
+      if (daten.wartenSekunden) localStorage.setItem(SPERRE, String(Date.now() + daten.wartenSekunden * 1000));
+      senden.disabled = false;
+      sperreZeigen();
+      return;
+    }
+    merken(daten.token, vollerText());
+    localStorage.setItem(SPERRE, String(Date.now() + (daten.sperreSekunden || 120) * 1000));
     localStorage.setItem('token', daten.token);
     location.href = '/status?t=' + encodeURIComponent(daten.token);
   } catch (err) {
