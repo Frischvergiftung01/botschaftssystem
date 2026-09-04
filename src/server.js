@@ -7,7 +7,18 @@
 
 const path = require('path');
 const crypto = require('crypto');
-const fastify = require('fastify')({ logger: { level: process.env.LOG_LEVEL || 'info' } });
+// Ohne IP im Log. Gebraucht wird sie nirgends: die Gerätesperre rechnet mit
+// einer Prüfsumme, die Anmeldesperre hält die Herkunft nur im Arbeitsspeicher.
+// Was nicht im Log steht, muss auch nicht erklärt und gelöscht werden.
+const fastify = require('fastify')({
+  logger: {
+    level: process.env.LOG_LEVEL || 'info',
+    serializers: {
+      req (req) { return { method: req.method, url: req.url }; },
+      res (res) { return { statusCode: res.statusCode }; }
+    }
+  }
+});
 const cfg = require('./config');
 const { FLAECHEN } = require('./flaechen');
 const { abfragen } = require('./db');
@@ -197,7 +208,7 @@ fastify.post('/api/moderation/anmelden', async (req, reply) => {
   }
   auth.versucheVergessen(herkunft);
   auth.anmelden(reply, req);
-  req.log.info({ herkunft }, 'Moderation angemeldet');
+  req.log.info('Moderation angemeldet');
   return { ok: true };
 });
 
