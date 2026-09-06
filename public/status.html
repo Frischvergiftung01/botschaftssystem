@@ -38,17 +38,32 @@
      fehlt die Datei, bleibt es beim dunklen Grund und der Punkt steht immer
      noch richtig. */
   .plankarte{padding:14px}
-  .fassade{position:relative;width:100%;aspect-ratio:64/10;background:#05070a;
-    border-radius:10px;overflow:hidden}
+  /* Zwei Ansichten desselben Bildes.
+     Die Übersicht beantwortet "welches Ende des Gebäudes", der Ausschnitt
+     "welche Säule". Auf einem Handy ist die Übersicht allein zu flach: 6,4:1
+     sind bei 360 px Breite ganze 56 px Höhe — der Punkt sitzt zwar richtig,
+     aber Säulen zählen kann man darin nicht. */
+  .fassade{position:relative;width:100%;background:#05070a;border-radius:10px;overflow:hidden}
   .fassade::before{content:"";position:absolute;inset:0;
-    background:url('/fassade-umriss.png') center/100% 100% no-repeat;
+    background-image:url('/fassade-umriss.png');background-repeat:no-repeat;
+    background-size:100% 100%;background-position:0 0;
     mix-blend-mode:screen;opacity:.5}
+  .uebersicht{aspect-ratio:64/10;opacity:.75}
+  /* Ein Drittel des Gebäudes: 2560 x 1200 der Canvas, also dreifach so hoch
+     dargestellt wie die Übersicht. */
+  .ausschnitt{aspect-ratio:64/30;margin-top:8px}
+  .ausschnitt::before{background-size:300% 100%;background-position:var(--x,0) 0}
+  /* Zeigt in der Übersicht, welcher Teil unten vergrößert ist. */
+  .lupe{position:absolute;top:0;bottom:0;border:1px solid rgba(255,207,107,.5);
+    border-radius:3px;background:rgba(255,207,107,.07);pointer-events:none}
+  .fassade.jetzt .lupe{border-color:rgba(126,224,168,.5);background:rgba(126,224,168,.07)}
   /* Eine Säulenfläche ist 44 von 7680 breit — als Rechteck auf einem Handy
      wäre sie zwei Pixel schmal. Deshalb ein Punkt fester Größe auf ihrer
      Mitte: sichtbar, und die Stelle stimmt trotzdem. */
-  .marke{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+  .marke{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;
     background:var(--gold);box-shadow:0 0 0 3px rgba(255,207,107,.25),0 0 20px 5px rgba(255,207,107,.5);
     animation:puls 1.8s ease-in-out infinite}
+  .ausschnitt .marke{width:18px;height:18px;margin:-9px 0 0 -9px}
   .fassade.jetzt .marke{background:var(--gruen);
     box-shadow:0 0 0 3px rgba(126,224,168,.25),0 0 20px 5px rgba(126,224,168,.55)}
   .planfuss{display:flex;justify-content:space-between;gap:10px;margin:10px 2px 0;
@@ -70,7 +85,11 @@
 </div>
 
 <div class="karte plankarte" id="plankarte" hidden>
-  <div class="fassade" id="fassade"><div class="marke" id="marke"></div></div>
+  <div class="fassade uebersicht" id="uebersicht">
+    <div class="lupe" id="lupe"></div>
+    <div class="marke" id="marke"></div>
+  </div>
+  <div class="fassade ausschnitt" id="ausschnitt"><div class="marke" id="markeGross"></div></div>
   <div class="planfuss">
     <span id="planOrt"></span>
     <span id="planSeite"></span>
@@ -135,16 +154,35 @@ async function laden () {
 const CANVAS_B = 7680, CANVAS_H = 1200, BANDHOEHE = 44;
 const SEITE = { links: 'linke Gebäudehälfte', rechts: 'rechte Gebäudehälfte', mitte: 'Gebäudemitte' };
 
+const LUPE = 1 / 3;   // wie viel des Gebäudes der Ausschnitt zeigt
+
 /** Setzt die Marke auf die Fläche — oder blendet den Plan aus. */
 function planZeigen (f, laeuftGerade) {
   const karte = el('plankarte');
   if (!f || !f.fassade) { karte.hidden = true; return; }
   karte.hidden = false;
+
   const breit = f.fassade.gedreht ? BANDHOEHE : f.breite;
   const hoch = f.fassade.gedreht ? f.breite : BANDHOEHE;
-  el('marke').style.left = ((f.fassade.x + breit / 2) / CANVAS_B * 100) + '%';
-  el('marke').style.top = ((f.fassade.y + hoch / 2) / CANVAS_H * 100) + '%';
-  el('fassade').classList.toggle('jetzt', Boolean(laeuftGerade));
+  const x = (f.fassade.x + breit / 2) / CANVAS_B;    // 0 … 1 über die Fassade
+  const y = (f.fassade.y + hoch / 2) / CANVAS_H;
+
+  el('marke').style.left = (x * 100) + '%';
+  el('marke').style.top = (y * 100) + '%';
+
+  // Der Ausschnitt legt sich um die Marke und bleibt dabei im Gebäude: an den
+  // Enden wandert nicht das Bild aus dem Rahmen, sondern die Marke aus der Mitte.
+  const links = Math.max(0, Math.min(1 - LUPE, x - LUPE / 2));
+  el('ausschnitt').style.setProperty('--x', (links / (1 - LUPE) * 100) + '%');
+  el('markeGross').style.left = ((x - links) / LUPE * 100) + '%';
+  el('markeGross').style.top = (y * 100) + '%';
+
+  const lupe = el('lupe');
+  lupe.style.left = (links * 100) + '%';
+  lupe.style.width = (LUPE * 100) + '%';
+
+  el('uebersicht').classList.toggle('jetzt', Boolean(laeuftGerade));
+  el('ausschnitt').classList.toggle('jetzt', Boolean(laeuftGerade));
   el('planOrt').innerHTML = '<b>' + f.ort + '</b>';
   el('planSeite').textContent = SEITE[f.seite] || '';
 }
