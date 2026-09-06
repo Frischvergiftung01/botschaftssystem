@@ -68,7 +68,7 @@ function takt () {
   if (!nachladenErlaubt()) return; // angehalten: Laufendes läuft aus
   const t = jetzt();
   // Nie zwei Wechsel im selben Augenblick — sonst flackert die halbe Fassade auf einmal.
-  const mindestabstand = Math.max(200, Math.round((cfg.standzeitSekunden * 1000) / FLAECHEN.length / 2));
+  const mindestabstand = Math.max(200, Math.round((einstellungen.standzeit() * 1000) / FLAECHEN.length / 2));
   for (const f of zustand.values()) {
     if (t < f.ende) continue;
     if (t - letzterWechsel < mindestabstand) break;
@@ -90,7 +90,7 @@ function belegen (f, t) {
     const g = groesseFuer(voll, f.breite, cfg.maxVersalhoehe);
     if (g.versalhoehe < cfg.minVersalhoehe) continue; // passt hier nicht lesbar drauf
 
-    const ende = t + cfg.standzeitSekunden * 1000;
+    const ende = t + einstellungen.standzeit() * 1000;
     f.botschaftId = b.id;
     f.text = voll;
     f.absender = b.name || null;

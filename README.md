@@ -18,6 +18,9 @@ wann und wo.
 | Simulator | `/simulator` | die Fassade im Browser, solange kein Projektor läuft |
 | Moderation | `/moderation` | Freigeben, Ablehnen, Zurückstellen — mit Kennwort |
 
+Wann gespielt wird, steht in den **Spielzeiten** (weiter unten): der Nachschub läuft nur innerhalb
+einer gestarteten Runde. Ohne eingetragene Zeiten läuft die Fassade durch.
+
 ## Starten
 
 ```bash
@@ -153,10 +156,39 @@ ungültig. Ohne Kennwort bleibt die Oberfläche zu — auch unter `/moderation.h
 **Durchsatzprobe:** `npm run queue-fuellen -- 300`, dann `/moderation` öffnen und die Stoppuhr
 laufen lassen. Der Kopf zeigt „letzte 5 min" und die Hochrechnung auf die Stunde.
 
+## Spielzeiten
+
+Die Mapping-Shows laufen zur vollen und zur halben Stunde; die rund siebzehn Minuten davor gehören
+den Botschaften. Jede dieser Runden ist eine **Session**, eingetragen unter `/moderation` im Reiter
+**Spielzeiten** — eine Zeile je Runde, oder mit einem Knopf im Raster erzeugt.
+
+Die beiden Zeiten wiegen verschieden schwer:
+
+- **Anfang** — unverbindlich. Er speist nur den Countdown im Balken über den Reitern und die
+  Auskunft an die Absender. Gestartet wird **von Hand**: fällt die Show einmal später, liefe ein
+  automatischer Start mitten hinein. Ist der geplante Start vorbei, zählt der Balken rot weiter.
+- **Ende** — verbindlich, und es heißt: **dann ist die Wand leer**. Der Nachschub hört dafür eine
+  Standzeit früher auf. Ein später Start verkürzt die Runde, das Ende bleibt stehen — deshalb steht
+  auf dem Startknopf, wie lang die Runde bei sofortigem Start noch wäre.
+
+**Ohne eingetragene Zeile läuft die Fassade durch wie bisher.** Das ist Absicht: an Probetagen will
+niemand Zeiten pflegen, und ein Deploy an einem Tag ohne Plan darf keine dunkle Wand ergeben.
+
+Was schon freigegeben ist, bleibt zwischen den Runden liegen und läuft in der nächsten mit — die
+Sessions halten nur den Nachschub an, sie verwerfen nichts. Der Sessionstand steht in der Datenbank
+und übersteht einen Neustart des Dienstes mitten am Abend.
+
+Die **Standzeit** steht im selben Reiter und lässt sich im Betrieb verstellen (5 bis 300 Sekunden).
+`STANDZEIT` aus der Umgebung ist nur noch der Startwert — wie bei den Schaltern soll am Abend
+niemand auf einen Redeploy warten.
+
 ## Was als Nächstes drankommt
 
 - **Block 6:** Bridge auf dem Medien-PC — der Simulator wird gegen Arena getauscht, beide bleiben
   umschaltbar
+- **Belegungsplan:** der Scheduler bucht ein paar Minuten im Voraus, damit die Statusseite nicht
+  nur sagen kann *wann*, sondern auch *wo* — wer am falschen Ende des Gebäudes steht, hat von
+  „läuft jetzt" nichts
 - **Block 7:** Ausbau — Statusseite mit Fassadenplan, Monitoring, Seed-Pool
 - **Block 8:** Härtung — Lasttest, Red-Team, Vollprobe
 

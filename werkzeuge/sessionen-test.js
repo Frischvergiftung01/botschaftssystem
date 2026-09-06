@@ -158,5 +158,35 @@ console.log('\nEine laufende Runde uebersteht das Umplanen');
     nachher && s.alsUhrzeit(nachher.geplant_ende));
 }
 
+console.log('\nStandzeit im Betrieb');
+{
+  const einstellungen = require('../src/einstellungen');
+  pruefe('Startwert kommt aus der Umgebung',
+    einstellungen.standzeit() === cfg.standzeitSekunden, einstellungen.standzeit());
+
+  einstellungen.standzeitSetzen(40);
+  pruefe('neuer Wert gilt', einstellungen.standzeit() === 40, einstellungen.standzeit());
+
+  for (const daneben of [0, 4, 301, 'viel', null]) {
+    let gefangen = false;
+    try { einstellungen.standzeitSetzen(daneben); } catch (e) { gefangen = true; }
+    pruefe('abgewiesen: ' + JSON.stringify(daneben), gefangen);
+  }
+  pruefe('der gute Wert steht noch', einstellungen.standzeit() === 40, einstellungen.standzeit());
+
+  // Und sie muss sofort in die Rueckrechnung vom Sessionende einfliessen.
+  // Planung von vorn: aus dem Block davor laeuft noch eine Runde.
+  db.prepare('DELETE FROM sessionen').run();
+  s.vergessen();
+  s.speichern([{ geplantStart: s.alsUhrzeit(jetztOrtsminute()), geplantEnde: '23:59' }]);
+  s.starten();
+  const l = s.laufende();
+  db.prepare('UPDATE sessionen SET ende = ? WHERE id = ?').run(Date.now() + 30000, l.id);
+  s.vergessen();
+  pruefe('bei 40 s Standzeit ist 30 s vor Schluss schon zu', s.nachschubErlaubt() === false);
+  einstellungen.standzeitSetzen(25);
+  pruefe('bei 25 s Standzeit ist noch offen', s.nachschubErlaubt() === true);
+}
+
 console.log('\n' + (fehler ? fehler + ' Fehler' : 'Alles gruen') + '\n');
 process.exit(fehler ? 1 : 0);

@@ -24,6 +24,7 @@
 
 const cfg = require('./config');
 const { db, abfragen } = require('./db');
+const einstellungen = require('./einstellungen');
 
 // ------------------------------------------------------------------ Zeitzone
 // Der Dienst laeuft in Coolify, also sehr wahrscheinlich auf UTC. Die
@@ -119,7 +120,7 @@ function nachschubErlaubt (jetzt = Date.now()) {
   if (!geplant()) return true;
   const l = laufende(jetzt);
   if (!l) return false;
-  return jetzt < l.ende - cfg.standzeitSekunden * 1000;
+  return jetzt < l.ende - einstellungen.standzeit() * 1000;
 }
 
 // ------------------------------------------------------------------ Aendern
@@ -230,7 +231,7 @@ function stand (jetzt = Date.now()) {
 
   let aktuell = null;
   if (l) {
-    const nachschubBis = l.ende - cfg.standzeitSekunden * 1000;
+    const nachschubBis = l.ende - einstellungen.standzeit() * 1000;
     aktuell = {
       nr: l.nr,
       start: l.start,

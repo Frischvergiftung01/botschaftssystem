@@ -8,6 +8,9 @@ const cfg = require('./config');
 const { abfragen } = require('./db');
 
 const SCHLUESSEL = { autoFreigabe: 'auto_freigabe', nachschub: 'nachschub' };
+const STANDZEIT = 'standzeit';
+const STANDZEIT_MIN = 5;
+const STANDZEIT_MAX = 300;
 
 function vorgabe () {
   return {
@@ -39,7 +42,42 @@ function setzen (name, wert) {
   return schalter();
 }
 
-/** Nach einem Leeren der Datenbank oder im Test. */
-function vergessen () { zwischenspeicher = null; }
+// ---------------------------------------------------------------- Standzeit
+// Wie lange eine Botschaft auf ihrer Flaeche stehen bleibt. Steht aus demselben
+// Grund hier wie die Schalter: wer am Abend merkt, dass 25 s zu lang oder zu
+// kurz sind, soll nicht auf einen Redeploy warten. Die Umgebungsvariable
+// STANDZEIT ist nur noch der Startwert.
+//
+// Eigener Zwischenspeicher statt mit den Schaltern zusammen: eine Dauer ist
+// kein Schalter, und `schalter()` soll weiter genau das liefern, was der Name
+// verspricht.
 
-module.exports = { schalter, setzen, vergessen };
+let standzeitSpeicher = null;
+
+/** Standzeit in Sekunden. Der Scheduler fragt viermal je Sekunde. */
+function standzeit () {
+  if (standzeitSpeicher !== null) return standzeitSpeicher;
+  const zeile = abfragen.einstellungLesen.get(STANDZEIT);
+  const gelesen = zeile ? Number(zeile.wert) : NaN;
+  standzeitSpeicher = Number.isFinite(gelesen) ? gelesen : cfg.standzeitSekunden;
+  return standzeitSpeicher;
+}
+
+function standzeitSetzen (sekunden) {
+  const n = Math.round(Number(sekunden));
+  if (!Number.isFinite(n) || n < STANDZEIT_MIN || n > STANDZEIT_MAX) {
+    throw new Error(`Die Standzeit muss zwischen ${STANDZEIT_MIN} und ${STANDZEIT_MAX} Sekunden liegen.`);
+  }
+  abfragen.einstellungSchreiben.run({
+    schluessel: STANDZEIT, wert: String(n), geaendert_am: Date.now()
+  });
+  standzeitSpeicher = null;
+  return standzeit();
+}
+
+/** Nach einem Leeren der Datenbank oder im Test. */
+function vergessen () { zwischenspeicher = null; standzeitSpeicher = null; }
+
+module.exports = {
+  schalter, setzen, standzeit, standzeitSetzen, vergessen, STANDZEIT_MIN, STANDZEIT_MAX
+};

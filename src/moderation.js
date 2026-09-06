@@ -159,6 +159,8 @@ function kennzahlen () {
     // Der Sessionstand faehrt hier mit, damit der Balken oben in der Oberflaeche
     // aus derselben Abfrage lebt wie die Zahlen — eine Anfrage statt zwei.
     session: sessionen.stand(),
+    standzeitSekunden: einstellungen.standzeit(),
+    standzeitGrenzen: { min: einstellungen.STANDZEIT_MIN, max: einstellungen.STANDZEIT_MAX },
     rasterGroesse: cfg.rasterGroesse,
     darfLeeren: cfg.datenbankLeerenErlaubt
   };

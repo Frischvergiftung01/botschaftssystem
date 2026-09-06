@@ -148,7 +148,7 @@ fastify.get('/api/status/:token', async (req, reply) => {
     vorDir: b.anzahl_anzeigen > 0 ? 0 : naechste,
     // grobe Schätzung: 33 Flächen wechseln alle im Schnitt einmal je Standzeit
     geschaetzteWartezeitSekunden: b.anzahl_anzeigen > 0 ? 0
-      : Math.round((naechste / FLAECHEN.length) * cfg.standzeitSekunden),
+      : Math.round((naechste / FLAECHEN.length) * einstellungen.standzeit()),
     jetztAuf: laufend ? flaecheInfo(laufend.flaeche) : null,
     zuletzt: anzeigen[0] ? { ...flaecheInfo(anzeigen[0].flaeche), start: anzeigen[0].start } : null
   };
@@ -172,7 +172,7 @@ fastify.get('/api/kennzahlen', async () => {
   return {
     botschaften: nach,
     flaechen: FLAECHEN.length,
-    standzeit: cfg.standzeitSekunden,
+    standzeit: einstellungen.standzeit(),
     autoFreigabe: einstellungen.schalter().autoFreigabe,
     schalter: einstellungen.schalter(),
     // Ohne den Plan: die Statusseite braucht nur, ob gerade gespielt wird und
@@ -282,6 +282,18 @@ fastify.post('/api/moderation/session-abbrechen', async (req, reply) => {
     return stand;
   } catch (e) {
     return reply.code(409).send({ fehler: e.message });
+  }
+});
+
+// Die Standzeit gehoert zu den Werten, die man am Abend anfassen koennen muss —
+// aus demselben Grund wie die Schalter: kein Redeploy zur Unzeit.
+fastify.post('/api/moderation/standzeit', async (req, reply) => {
+  try {
+    const sekunden = einstellungen.standzeitSetzen(req.body?.sekunden);
+    req.log.warn({ sekunden }, 'Standzeit geaendert');
+    return { standzeitSekunden: sekunden };
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
   }
 });
 

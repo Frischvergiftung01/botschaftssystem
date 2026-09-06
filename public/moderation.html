@@ -60,6 +60,11 @@
   .planzeile .weck:hover{color:var(--warn)}
   .planzeile.laeuftgerade{background:rgba(95,208,138,.06)}
   .trenner{color:var(--leise)}
+  /* Ungespeicherte Aenderungen muss man sehen: sonst aendert man eine Uhrzeit,
+     schaut auf den Balken und wundert sich, dass er noch das Alte zeigt. */
+  .ungespeichert{color:var(--gold)}
+  #planSpeichern.offen{box-shadow:0 0 0 3px rgba(255,207,107,.4)}
+  .planzeile input.offen{border-color:var(--gold)}
 
   .seiten{display:flex;gap:14px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--rand);
     font-size:.82rem;color:var(--leise)}
@@ -211,6 +216,19 @@
     </div>
 
     <div class="karte" style="margin-top:14px">
+      <h2>Standzeit</h2>
+      <p class="fuss">Wie lange eine Botschaft auf ihrer Fläche stehen bleibt. Gilt sofort für jede
+      Fläche, die danach wechselt — was gerade steht, läuft mit der alten Zeit aus.<br>
+      <span id="standzeitFolge"></span></p>
+      <div class="werkzeug">
+        <input id="standzeitFeld" style="width:5rem;text-align:center" inputmode="numeric">
+        <span class="fuss">Sekunden</span>
+        <button class="pille" id="standzeitKnopf">Übernehmen</button>
+        <span class="fuss" id="standzeitStand"></span>
+      </div>
+    </div>
+
+    <div class="karte" style="margin-top:14px">
       <h2>Zeiten erzeugen</h2>
       <p class="fuss">Füllt die Tabelle im Raster der Mapping-Shows. Ersetzt die bestehenden Zeilen —
       gespeichert wird erst mit „Speichern“ oben.</p>
@@ -288,6 +306,7 @@ let stand = {};
 let sessionStand = null;    // Spielzeiten, kommt mit den Kennzahlen mit
 let zeitVersatz = 0;        // Serveruhr minus eigene Uhr
 let planZeilen = [];        // lokaler Bearbeitungsstand der Zeilentabelle
+let planGeaendert = false;  // getippt, aber noch nicht gespeichert
 
 start();
 
@@ -323,9 +342,12 @@ async function start () {
   el('leerenKnopf').addEventListener('click', leeren);
   el('spielStart').addEventListener('click', spielStarten);
   el('spielAbbruch').addEventListener('click', spielAbbrechen);
-  el('zeileDazu').addEventListener('click', () => { planZeilen.push({ von: '', bis: '' }); planZeichnen(); });
+  el('zeileDazu').addEventListener('click', () => {
+    planZeilen.push({ von: '', bis: '' }); planZeichnen(); planOffen();
+  });
   el('planSpeichern').addEventListener('click', planSpeichern);
   el('genKnopf').addEventListener('click', zeitenErzeugen);
+  el('standzeitKnopf').addEventListener('click', standzeitUebernehmen);
   // Der Balken zaehlt selbst herunter, statt sekuendlich zu fragen.
   setInterval(spielbalkenZeichnen, 1000);
   document.addEventListener('keydown', taste);
@@ -406,11 +428,16 @@ function zahlenZeichnen () {
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
   el('leerenKnopf').disabled = !stand.darfLeeren;
   if (stand.session) sessionSetzen(stand.session);
+  standzeitZeichnen();
 }
 
 // ---------------------------------------------------------------- Zeichnen
 
 function wechseln (neu) {
+  // Wer die Spielzeiten mit ungespeicherten Zeilen verlaesst, verliert sie —
+  // lieber einmal nachfragen als am Abend eine Runde ohne Zeiten haben.
+  if (ansicht === 'spielzeiten' && neu !== 'spielzeiten' && planGeaendert
+      && !confirm('Die geänderten Spielzeiten sind noch nicht gespeichert.\n\nTrotzdem wechseln?')) return;
   if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
   ansicht = neu;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
@@ -784,7 +811,28 @@ async function planHolen () {
   sessionSetzen(d);
   planZeilen = d.zeilen.map(z => ({ von: z.geplantStart, bis: z.geplantEnde, lage: planLage(z, d) }));
   planZeichnen();
-  el('planStand').textContent = '';
+  planZu('');
+}
+
+/**
+ * Zeilen sind getippt, aber noch nicht beim Server. Wichtig genug fuer eine
+ * eigene Anzeige: der Balken oben lebt vom gespeicherten Stand, und wer das
+ * nicht weiss, aendert eine Uhrzeit und haelt den unveraenderten Countdown
+ * fuer einen Fehler.
+ */
+function planOffen (text) {
+  planGeaendert = true;
+  el('planSpeichern').classList.add('offen');
+  el('planStand').className = 'fuss ungespeichert';
+  el('planStand').textContent = text || 'Geändert — noch nicht gespeichert.';
+}
+
+function planZu (text) {
+  planGeaendert = false;
+  el('planSpeichern').classList.remove('offen');
+  el('planStand').className = 'fuss';
+  el('planStand').textContent = text || '';
+  document.querySelectorAll('.planzeile input.offen').forEach(i => i.classList.remove('offen'));
 }
 
 function planLage (z, s) {
@@ -815,14 +863,14 @@ function planZeichnen () {
 
     const von = document.createElement('input');
     von.value = z.von; von.placeholder = '19:12'; von.setAttribute('aria-label', 'Anfang Runde ' + (i + 1));
-    von.addEventListener('input', () => { planZeilen[i].von = von.value; });
+    von.addEventListener('input', () => { planZeilen[i].von = von.value; von.classList.add('offen'); planOffen(); });
 
     const strich = document.createElement('span');
     strich.className = 'trenner'; strich.textContent = 'bis';
 
     const bis = document.createElement('input');
     bis.value = z.bis; bis.placeholder = '19:29'; bis.setAttribute('aria-label', 'Ende Runde ' + (i + 1));
-    bis.addEventListener('input', () => { planZeilen[i].bis = bis.value; });
+    bis.addEventListener('input', () => { planZeilen[i].bis = bis.value; bis.classList.add('offen'); planOffen(); });
 
     const lage = document.createElement('span');
     lage.className = 'lage' + (z.lage ? ' ' + z.lage.art : '');
@@ -831,7 +879,7 @@ function planZeichnen () {
     const weg = document.createElement('button');
     weg.className = 'weck'; weg.textContent = 'entfernen';
     weg.title = 'Diese Runde aus dem Plan nehmen';
-    weg.addEventListener('click', () => { planZeilen.splice(i, 1); planZeichnen(); });
+    weg.addEventListener('click', () => { planZeilen.splice(i, 1); planZeichnen(); planOffen(); });
 
     for (const teil of [nr, von, strich, bis, lage, weg]) zeile.appendChild(teil);
     ziel.appendChild(zeile);
@@ -848,10 +896,34 @@ async function planSpeichern () {
   sessionSetzen(d);
   planZeilen = d.zeilen.map(z => ({ von: z.geplantStart, bis: z.geplantEnde, lage: planLage(z, d) }));
   planZeichnen();
-  el('planStand').textContent = d.zeilen.length
+  planZu(d.zeilen.length
     ? d.zeilen.length + ' Runden gespeichert.'
-    : 'Keine Runde eingetragen — die Fassade läuft durch.';
+    : 'Keine Runde eingetragen — die Fassade läuft durch.');
   melden('Spielzeiten gespeichert.');
+}
+
+// ---- Standzeit
+
+function standzeitZeichnen () {
+  if (typeof stand.standzeitSekunden !== 'number') return;
+  const feld = el('standzeitFeld');
+  // Nicht ueberschreiben, waehrend jemand tippt.
+  if (document.activeElement !== feld) feld.value = stand.standzeitSekunden;
+  el('standzeitFolge').textContent = 'Sie bestimmt auch das Auslaufen: der Nachschub hört '
+    + stand.standzeitSekunden + ' Sekunden vor dem eingetragenen Ende auf, damit die Wand pünktlich leer ist.';
+}
+
+async function standzeitUebernehmen () {
+  const antwort = await fetch('/api/moderation/standzeit', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ sekunden: Number(el('standzeitFeld').value) })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { el('standzeitStand').textContent = d.fehler || 'Nicht möglich.'; return; }
+  stand.standzeitSekunden = d.standzeitSekunden;
+  el('standzeitStand').textContent = 'Übernommen.';
+  standzeitZeichnen();
+  melden('Standzeit ' + d.standzeitSekunden + ' s — gilt ab dem nächsten Wechsel.');
 }
 
 function zeitenErzeugen () {
@@ -875,8 +947,8 @@ function zeitenErzeugen () {
   }
   planZeilen = erzeugt;
   planZeichnen();
-  el('planStand').textContent = erzeugt.length + ' Zeilen erzeugt — noch nicht gespeichert.'
-    + (abgeschnitten ? ' Die späteren lägen nach Mitternacht und wurden weggelassen.' : '');
+  planOffen(erzeugt.length + ' Zeilen erzeugt — noch nicht gespeichert.'
+    + (abgeschnitten ? ' Die späteren lägen nach Mitternacht und wurden weggelassen.' : ''));
 }
 
 // ---------------------------------------------------------------- Nebenseiten

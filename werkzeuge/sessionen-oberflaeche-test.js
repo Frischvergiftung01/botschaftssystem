@@ -94,6 +94,60 @@ async function balkenText (seite) {
       await seite.locator('#spielStart').textContent());
   }
 
+  console.log('\nGeaenderte Zeile ist als ungespeichert erkennbar');
+  {
+    // Der gemeldete Fall: Startzeit geaendert, der Balken zeigt weiter die
+    // alte Zeit. Das ist richtig — er lebt vom gespeicherten Stand —, war
+    // aber nicht zu sehen. Jetzt sagt es die Oberflaeche.
+    const vorher = await balkenText(seite);
+    // Neuer Anfang zehn Minuten vor dem Ende dieser Zeile — sonst laege er
+    // dahinter und die Pruefung liefe in die Ablehnung statt in den Fall,
+    // um den es hier geht.
+    const bis = await seite.locator('.planzeile input').nth(1).inputValue();
+    const [bh, bm] = bis.split(':').map(Number);
+    const anfangMin = bh * 60 + bm - 10;
+    const neuerAnfang = String(Math.floor(anfangMin / 60)).padStart(2, '0')
+      + ':' + String(anfangMin % 60).padStart(2, '0');
+    await seite.fill('.planzeile input >> nth=0', neuerAnfang);
+    pruefe('Hinweis erscheint sofort',
+      /nicht gespeichert/.test(await seite.locator('#planStand').textContent()),
+      await seite.locator('#planStand').textContent());
+    pruefe('der Speichernknopf faellt auf',
+      await seite.locator('#planSpeichern.offen').count() === 1);
+    pruefe('das Feld ist markiert',
+      await seite.locator('.planzeile input.offen').count() >= 1);
+    pruefe('der Balken zeigt noch den gespeicherten Stand', (await balkenText(seite)) === vorher);
+
+    await seite.click('#planSpeichern');
+    await seite.waitForFunction(() => /Runden gespeichert/.test(document.getElementById('planStand').textContent));
+    pruefe('nach dem Speichern ist der Hinweis weg',
+      await seite.locator('#planSpeichern.offen').count() === 0);
+    const nachher = await balkenText(seite);
+    pruefe('und der Balken zieht nach', nachher.includes(neuerAnfang), nachher + ' erwartet ' + neuerAnfang);
+  }
+
+  console.log('\nStandzeit laesst sich im Betrieb verstellen');
+  {
+    const feld = seite.locator('#standzeitFeld');
+    pruefe('das Feld zeigt den laufenden Wert', (await feld.inputValue()) === '25', await feld.inputValue());
+    await seite.fill('#standzeitFeld', '40');
+    await seite.click('#standzeitKnopf');
+    await seite.waitForFunction(() => /Übernommen/.test(document.getElementById('standzeitStand').textContent));
+    pruefe('die Folge fuers Auslaufen steht dabei',
+      /40 Sekunden vor dem eingetragenen Ende/.test(await seite.locator('#standzeitFolge').textContent()),
+      await seite.locator('#standzeitFolge').textContent());
+
+    await seite.fill('#standzeitFeld', '2');
+    await seite.click('#standzeitKnopf');
+    await seite.waitForFunction(() => /zwischen/.test(document.getElementById('standzeitStand').textContent));
+    pruefe('Unsinn wird mit Grund abgewiesen',
+      /zwischen 5 und 300/.test(await seite.locator('#standzeitStand').textContent()),
+      await seite.locator('#standzeitStand').textContent());
+    await seite.fill('#standzeitFeld', '25');
+    await seite.click('#standzeitKnopf');
+    await seite.waitForFunction(() => /Übernommen/.test(document.getElementById('standzeitStand').textContent));
+  }
+
   console.log('\nFehlerhafte Eingabe wird abgefangen');
   {
     await seite.fill('.planzeile input >> nth=0', 'gleich');
