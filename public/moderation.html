@@ -91,6 +91,9 @@
     opacity:0;pointer-events:none;transition:opacity .15s;z-index:10}
   .hinweis.da{opacity:1}
   .fuss{color:#6b748b;font-size:.8rem;line-height:1.6}
+  /* Kombinierte Ansicht: Raster über Einzeln, Leiste nicht klebend */
+  main.uebersicht #raster{order:-1}
+  main.uebersicht .leiste{position:static;border-top:1px solid var(--rand);padding:12px 0 0}
 
   /* Nebenseiten laufen in einem Rahmen unter der Moderation — wer den Simulator
      aufmacht, verliert seine Warteschlange nicht. */
@@ -137,8 +140,7 @@
 </div>
 
 <nav>
-  <button data-ansicht="einzeln" class="aktiv">Einzeln<kbd>E</kbd></button>
-  <button data-ansicht="raster">Raster<kbd>R</kbd></button>
+  <button data-ansicht="uebersicht" class="aktiv">Übersicht</button>
   <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
   <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
   <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
@@ -148,7 +150,7 @@
 <main>
   <section id="einzeln"></section>
 
-  <section id="raster" hidden>
+  <section id="raster">
     <div class="kacheln" id="kacheln"></div>
     <div class="leiste">
       <button class="pille" id="rasterFreigeben" style="background:var(--gut);color:#04240f;border:0;padding:12px 18px;font-size:.95rem;font-weight:650">Übrige freigeben <kbd>F</kbd></button>
@@ -181,12 +183,10 @@
     <div class="karte" style="margin-top:14px">
       <h2>Tastatur</h2>
       <p class="fuss">Jede Taste steht auch auf dem Knopf, zu dem sie gehört.<br>
-      <b>1</b>/<b>F</b> freigeben · <b>2</b>/<b>A</b> ablehnen · <b>3</b>/<b>Z</b> zurückstellen ·
-      <b>U</b> rückgängig · <b>N</b> neu laden<br>
-      Ansichten: <b>E</b> einzeln · <b>R</b> Raster · <b>T</b> zurückgestellt · <b>P</b> auf der Fassade ·
-      <b>X</b> abgelehnt<br>
-      Im Raster gibt <b>F</b> die übrigen Kacheln frei, <b>3</b> stellt die herausgenommenen zurück.
-      In den Listenansichten wird je Zeile geklickt — dafür gibt es keine Taste.
+      Kritische Botschaft: <b>1</b> freigeben · <b>2</b> ablehnen · <b>3</b> zurückstellen · <b>U</b> rückgängig<br>
+      Unkritische: <b>F</b> alle übrigen freigeben (Sammelfreigabe oben)<br>
+      Allgemein: <b>N</b> neu laden · <b>T</b> zurückgestellt · <b>P</b> auf der Fassade · <b>X</b> abgelehnt<br>
+      Zahlen funktionieren auf der Zahlenreihe und dem Nummernblock. In den Listenansichten wird je Zeile geklickt.
       Nach jeder Entscheidung rückt die nächste Botschaft nach.</p>
     </div>
   </section>
@@ -209,7 +209,7 @@
 <script>
 const BANDHOEHE = 44, VERSAL_ANTEIL = 0.81, RAND = 2;
 const el = id => document.getElementById(id);
-let ansicht = 'einzeln';
+let ansicht = 'uebersicht';
 let vorrat = [];            // Einzelprüfung
 let rasterVorrat = [];      // Rasteransicht
 let raus = new Set();       // im Raster herausgeklickte ids
@@ -247,7 +247,13 @@ async function start () {
   document.addEventListener('keydown', taste);
   window.addEventListener('resize', () => zeichnen());
   setInterval(zahlenHolen, 5000);
+  // Kombinierte Ansicht initialisieren
+  el('raster').hidden = false;
+  document.querySelector('main').classList.add('uebersicht');
   await laden(true);
+  // Simulator standardmäßig unten einblenden
+  const simLink = [...document.querySelectorAll('.seiten a')].find(a => a.getAttribute('href') === '/simulator');
+  rahmenAuf('/simulator', 'Simulator', simLink, true);
   setInterval(() => { if (ansicht !== 'werkzeuge') nachfuellen(); }, 10000);
 }
 
@@ -255,6 +261,21 @@ async function start () {
 
 async function laden (frisch) {
   if (ansicht === 'werkzeuge') { zeichnen(); return; }
+  if (ansicht === 'uebersicht') {
+    const [r1, r2] = await Promise.all([
+      fetch('/api/moderation/queue?ansicht=einzeln&grenze=60'),
+      fetch('/api/moderation/queue?ansicht=raster&grenze=60')
+    ]);
+    if (r1.status === 401 || r2.status === 401) { location.href = '/moderation/anmelden'; return; }
+    const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+    stand = d1.kennzahlen;
+    vorrat = d1.botschaften;
+    rasterVorrat = d2.botschaften.slice(0, stand.rasterGroesse || 12);
+    if (frisch) raus = new Set();
+    zahlenZeichnen();
+    zeichnen();
+    return;
+  }
   const antwort = await fetch('/api/moderation/queue?ansicht=' + ansicht + '&grenze=60');
   if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
   const d = await antwort.json();
@@ -267,6 +288,11 @@ async function laden (frisch) {
 }
 
 async function nachfuellen () {
+  if (ansicht === 'uebersicht') {
+    if (vorrat.length < 8 || rasterVorrat.length < (stand.rasterGroesse || 12)) await laden(false);
+    else zahlenHolen();
+    return;
+  }
   const knapp = (ansicht === 'einzeln' && vorrat.length < 8)
     || (ansicht === 'raster' && rasterVorrat.length < (stand.rasterGroesse || 12))
     || (ansicht !== 'einzeln' && ansicht !== 'raster');
@@ -303,15 +329,18 @@ function wechseln (neu) {
   if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
   ansicht = neu;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
-  for (const s of ['einzeln', 'raster', 'liste', 'werkzeuge']) {
-    const sichtbar = neu === s || (s === 'liste' && ['zurueckgestellt', 'pool', 'abgelehnt'].includes(neu));
-    el(s).hidden = !sichtbar;
-  }
+  const haupt = neu === 'uebersicht';
+  el('einzeln').hidden = !haupt;
+  el('raster').hidden = !haupt;
+  el('liste').hidden = !['zurueckgestellt', 'pool', 'abgelehnt'].includes(neu);
+  el('werkzeuge').hidden = neu !== 'werkzeuge';
+  document.querySelector('main').classList.toggle('uebersicht', haupt);
   laden(true);
 }
 
 function zeichnen () {
-  if (ansicht === 'einzeln') zeichnenEinzeln();
+  if (ansicht === 'uebersicht') { zeichnenEinzeln(); zeichnenRaster(); }
+  else if (ansicht === 'einzeln') zeichnenEinzeln();
   else if (ansicht === 'raster') zeichnenRaster();
   else if (ansicht !== 'werkzeuge') zeichnenListe();
 }
@@ -583,22 +612,34 @@ function taste (e) {
   if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape' && !el('rahmen').hidden) { e.preventDefault(); return rahmenZu(); }
   const t = e.key.toLowerCase();
-  if (t === 'e') return wechseln('einzeln');
-  if (t === 'r') return wechseln('raster');
   if (t === 't') return wechseln('zurueckgestellt');
   if (t === 'p') return wechseln('pool');
   if (t === 'x') return wechseln('abgelehnt');
   if (t === 'n') { e.preventDefault(); return laden(true); }
   if (t === 'u') { e.preventDefault(); return rueckgaengig(); }
-  if (ansicht === 'einzeln') {
+  // Nummernblock und normale Zahlenreihe liefern beide denselben e.key-Wert;
+  // e.code sichert den Nummernblock zusätzlich ab, falls NumLock aus ist.
+  const n1 = t === '1' || e.code === 'Numpad1';
+  const n2 = t === '2' || e.code === 'Numpad2';
+  const n3 = t === '3' || e.code === 'Numpad3';
+  if (ansicht === 'uebersicht') {
+    // F → Sammelfreigabe der unkritischen Botschaften (Raster oben)
+    if (t === 'f') { e.preventDefault(); rasterFreigeben(); return; }
+    // 1/2/3 → Einzelentscheidung der kritischen Botschaft (unten)
     const item = vorrat[0];
     if (!item) return;
-    if (t === '1' || t === 'f') { e.preventDefault(); entscheiden([item.id], 'freigeben', 'neu'); }
-    if (t === '2' || t === 'a') { e.preventDefault(); entscheiden([item.id], 'ablehnen', 'neu'); }
-    if (t === '3' || t === 'z') { e.preventDefault(); entscheiden([item.id], 'zurueckstellen', 'neu'); }
+    if (n1) { e.preventDefault(); entscheiden([item.id], 'freigeben', 'neu'); }
+    if (n2) { e.preventDefault(); entscheiden([item.id], 'ablehnen', 'neu'); }
+    if (n3) { e.preventDefault(); entscheiden([item.id], 'zurueckstellen', 'neu'); }
+  } else if (ansicht === 'einzeln') {
+    const item = vorrat[0];
+    if (!item) return;
+    if (n1 || t === 'f') { e.preventDefault(); entscheiden([item.id], 'freigeben', 'neu'); }
+    if (n2 || t === 'a') { e.preventDefault(); entscheiden([item.id], 'ablehnen', 'neu'); }
+    if (n3 || t === 'z') { e.preventDefault(); entscheiden([item.id], 'zurueckstellen', 'neu'); }
   } else if (ansicht === 'raster') {
-    if (t === '1' || t === 'f' || e.key === 'Enter') { e.preventDefault(); rasterFreigeben(); }
-    if (t === '3' || t === 'z') { e.preventDefault(); rasterSpaeter(); }
+    if (n1 || t === 'f' || e.key === 'Enter') { e.preventDefault(); rasterFreigeben(); }
+    if (n3 || t === 'z') { e.preventDefault(); rasterSpaeter(); }
   }
 }
 </script>
