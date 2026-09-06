@@ -180,6 +180,33 @@ async function balkenText (seite) {
     await seite.waitForFunction(() => /Übernommen/.test(document.getElementById('standzeitStand').textContent));
   }
 
+  console.log('\nSchalter Belegungsplan im Reiter Werkzeuge');
+  {
+    await seite.click('nav button[data-ansicht="werkzeuge"]');
+    await seite.waitForTimeout(200);
+    pruefe('der Knopf ist da', await seite.locator('#sPlan').isVisible());
+    pruefe('und steht auf an', /Belegungsplan an/.test(await seite.locator('#sPlan').textContent()),
+      await seite.locator('#sPlan').textContent());
+
+    // Der Dialog wird oben automatisch bestaetigt.
+    await seite.click('#sPlan');
+    await seite.waitForFunction(() => /Belegungsplan aus/.test(document.getElementById('sPlan').textContent));
+    pruefe('die Folge steht dabei',
+      /keinen Ort/.test(await seite.locator('#belegungsplanStand').textContent()),
+      await seite.locator('#belegungsplanStand').textContent());
+    const stand = await (await kontext.request.get(BASIS + '/api/moderation/kennzahlen')).json();
+    pruefe('der Server hat den Schalter wirklich umgelegt', stand.schalter.belegungsplan === false,
+      JSON.stringify(stand.schalter));
+
+    await seite.click('#sPlan');
+    await seite.waitForFunction(() => /Belegungsplan an/.test(document.getElementById('sPlan').textContent));
+    const zurueck = await (await kontext.request.get(BASIS + '/api/moderation/kennzahlen')).json();
+    pruefe('und wieder zurueck', zurueck.schalter.belegungsplan === true, JSON.stringify(zurueck.schalter));
+
+    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.waitForTimeout(200);
+  }
+
   console.log('\nFehlerhafte Eingabe wird abgefangen');
   {
     await seite.fill('.planzeile input >> nth=0', 'gleich');

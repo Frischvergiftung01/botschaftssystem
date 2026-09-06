@@ -298,6 +298,18 @@
       Botschaften laufen aus. Einzelne Botschaften nimmt „Auf der Fassade → Sperren“ sofort herunter.</p>
     </div>
     <div class="karte" style="margin-top:14px">
+      <h2>Belegungsplan</h2>
+      <p class="fuss">Der Plan bucht die Flächen einige Minuten im Voraus — nur dadurch kann die
+      Statusseite dem Absender vorher sagen, <b>wo</b> seine Botschaft erscheint.<br>
+      <b>Aus</b> heißt: der Scheduler entscheidet wieder erst im Moment des Wechsels. Die Fassade
+      läuft dabei normal weiter, nur die Ortsangabe fällt weg. Notausstieg, falls sich der Plan
+      seltsam verhält — wirkt sofort, ohne Redeploy.</p>
+      <div class="werkzeug">
+        <button class="pille" id="sPlan">Belegungsplan</button>
+        <span class="fuss" id="belegungsplanStand"></span>
+      </div>
+    </div>
+    <div class="karte" style="margin-top:14px">
       <h2>Datenbank leeren</h2>
       <p class="fuss">Löscht alle Botschaften und Anzeigen — für die Vorbereitung, nicht für den Abend.
       Zum Bestätigen <b>LEEREN</b> eintippen.</p>
@@ -382,6 +394,7 @@ async function start () {
   });
   el('sAuto').addEventListener('click', () => schalten('autoFreigabe'));
   el('sNachschub').addEventListener('click', () => schalten('nachschub'));
+  el('sPlan').addEventListener('click', () => schalten('belegungsplan'));
   el('rasterFreigeben').addEventListener('click', rasterFreigeben);
   el('rasterSpaeter').addEventListener('click', rasterSpaeter);
   el('rasterNeu').addEventListener('click', () => laden(true));
@@ -477,6 +490,12 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  const p = stand.schalter.belegungsplan !== false;
+  el('sPlan').textContent = 'Belegungsplan ' + (p ? 'an' : 'aus');
+  el('sPlan').className = 'pille ' + (p ? 'an' : 'aus');
+  el('belegungsplanStand').textContent = p
+    ? 'Flächen werden im Voraus gebucht — die Statusseite nennt Ort und Zeit.'
+    : 'Aus — der Scheduler entscheidet erst beim Wechsel, die Statusseite nennt keinen Ort.';
   el('leerenKnopf').disabled = !stand.darfLeeren;
   if (stand.session) sessionSetzen(stand.session);
   standzeitZeichnen();
@@ -719,6 +738,7 @@ function rasterSpaeter () {
 async function schalten (name) {
   const wert = !stand.schalter[name];
   if (name === 'autoFreigabe' && wert && !confirm('Auto-Freigabe wieder einschalten? Saubere Botschaften gehen dann ohne Moderation an die Fassade.')) return;
+  if (name === 'belegungsplan' && !wert && !confirm('Belegungsplan abschalten? Die Fassade läuft weiter, aber die Statusseite kann dem Absender dann nicht mehr sagen, wo seine Botschaft erscheint.')) return;
   const antwort = await fetch('/api/moderation/schalter', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name, wert })
@@ -726,9 +746,11 @@ async function schalten (name) {
   const d = await antwort.json();
   stand.schalter = d.schalter;
   zahlenZeichnen();
-  melden(name === 'autoFreigabe'
-    ? 'Auto-Freigabe ' + (wert ? 'an — saubere Botschaften gehen ohne Moderation durch' : 'aus — alles geht durch die Moderation')
-    : 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'));
+  melden({
+    autoFreigabe: 'Auto-Freigabe ' + (wert ? 'an — saubere Botschaften gehen ohne Moderation durch' : 'aus — alles geht durch die Moderation'),
+    nachschub: 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'),
+    belegungsplan: 'Belegungsplan ' + (wert ? 'an — Flächen werden wieder im Voraus gebucht' : 'aus — der Scheduler entscheidet erst beim Wechsel')
+  }[name]);
 }
 
 async function leeren () {
