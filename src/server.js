@@ -29,6 +29,7 @@ const scheduler = require('./scheduler');
 const auth = require('./auth');
 const moderation = require('./moderation');
 const einstellungen = require('./einstellungen');
+const sessionen = require('./sessionen');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
 
@@ -174,6 +175,9 @@ fastify.get('/api/kennzahlen', async () => {
     standzeit: cfg.standzeitSekunden,
     autoFreigabe: einstellungen.schalter().autoFreigabe,
     schalter: einstellungen.schalter(),
+    // Ohne den Plan: die Statusseite braucht nur, ob gerade gespielt wird und
+    // wann es weitergeht. Die Zeilentabelle bleibt der Moderation vorbehalten.
+    session: sessionKurz(),
     // Damit am Abend in einem Blick sichtbar ist, ob die Kette noch mitkommt.
     stufe1b: { aktiv: mistral.aktiv(), modell: cfg.mistralModell, ...mistral.kennzahlen() }
   };
@@ -242,6 +246,45 @@ fastify.post('/api/moderation/schalter', async (req, reply) => {
   return { schalter: stand };
 });
 
+// ---------------------------------------------------------------- Spielzeiten
+// Der Plan des Abends. Gestartet wird von Hand — faellt die Mapping-Show
+// einmal spaeter, liefe ein automatischer Start mitten hinein.
+
+fastify.get('/api/moderation/sessionen', async () => sessionen.stand());
+
+fastify.post('/api/moderation/sessionen', async (req, reply) => {
+  const zeilen = Array.isArray(req.body?.zeilen) ? req.body.zeilen : null;
+  if (!zeilen) return reply.code(400).send({ fehler: 'Es fehlen die Zeilen.' });
+  if (zeilen.length > 40) return reply.code(400).send({ fehler: 'Hoechstens 40 Runden.' });
+  try {
+    const n = sessionen.speichern(zeilen);
+    req.log.info({ zeilen: n }, 'Spielzeiten gespeichert');
+    return sessionen.stand();
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
+  }
+});
+
+fastify.post('/api/moderation/session-starten', async (req, reply) => {
+  try {
+    const stand = sessionen.starten();
+    req.log.warn({ nr: stand.aktuell && stand.aktuell.nr, endet: stand.aktuell && stand.aktuell.endeUhrzeit }, 'Session gestartet');
+    return stand;
+  } catch (e) {
+    return reply.code(409).send({ fehler: e.message });
+  }
+});
+
+fastify.post('/api/moderation/session-abbrechen', async (req, reply) => {
+  try {
+    const stand = sessionen.abbrechen();
+    req.log.warn('Session abgebrochen');
+    return stand;
+  } catch (e) {
+    return reply.code(409).send({ fehler: e.message });
+  }
+});
+
 fastify.post('/api/moderation/datenbank-leeren', async (req, reply) => {
   if (!cfg.datenbankLeerenErlaubt) return reply.code(403).send({ fehler: 'Auf diesem Stand abgeschaltet (DATENBANK_LEEREN=false).' });
   if (String(req.body?.bestaetigung ?? '') !== 'LEEREN') return reply.code(400).send({ fehler: 'Bitte LEEREN zur Bestätigung eintippen.' });
@@ -268,6 +311,12 @@ const RANG = { FREI: 0, PRUEFEN: 1, ABLEHNEN: 2 };
 function strengeres (a, b) {
   if (!b) return a;
   return RANG[b] > RANG[a] ? b : a;
+}
+
+/** Sessionstand ohne die Zeilentabelle — fuer oeffentliche Auskuenfte. */
+function sessionKurz () {
+  const { zeilen, ...rest } = sessionen.stand();
+  return { ...rest, geplant: zeilen.length };
 }
 
 function flaecheInfo (nr) {
