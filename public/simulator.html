@@ -16,6 +16,16 @@
   .zahlen b{color:#e8ecf3;font-weight:600;font-variant-numeric:tabular-nums}
   label{color:var(--leise);font-size:.85rem;display:flex;gap:6px;align-items:center}
   .buehne{position:relative;width:100%;margin:0 auto;background:#05070a}
+  /* Der Gebäudeumriss liegt hinter den Flächen. Die Zeichnung ist 7680 x 1200
+     — dieselbe Canvas wie in Resolume —, deshalb passt sie ohne jede
+     Ausrichtung: die Bühne ist genau dieses Rechteck, skaliert.
+     `screen` blendet Schwarz weg. Damit funktioniert sowohl das transparente
+     PNG als auch ein Export mit schwarzem Grund direkt aus dem CAD.
+     Fehlt die Datei, bleibt es einfach beim dunklen Grund. */
+  .buehne::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:url('/fassade-umriss.png') center/100% 100% no-repeat;
+    mix-blend-mode:screen;opacity:var(--umriss,.45)}
+  .buehne.ohneUmriss::before{display:none}
   .flaeche{position:absolute;border:1px solid var(--rahmen)}
   .flaeche.kalibrierung{border-color:var(--kalib)}
   /* Der innere Kasten ist immer das liegende Band (Breite x 44 px). Bei den
@@ -38,13 +48,16 @@
     <span id="verbindung">verbunden</span>
   </div>
   <label><input type="checkbox" id="rahmen" checked> Flächenrahmen zeigen</label>
+  <label><input type="checkbox" id="umriss" checked> Gebäudeumriss zeigen</label>
 </header>
 
 <div class="buehne" id="buehne"></div>
 
 <p class="fuss">
   Dieselben Daten, die später die Bridge an Resolume schickt: Text, Schrifthöhe und Y-Versatz je Fläche.
-  Die Blende läuft mit 0,35 s wie der <code>Smooth</code>-Knoten im Patch.
+  Die Blende läuft mit 0,35 s wie der <code>Smooth</code>-Knoten im Patch.<br>
+  Der Gebäudeumriss im Hintergrund ist <code>public/fassade-umriss.png</code> — eine Zeichnung auf
+  der Resolume-Canvas (7680 × 1200). Fehlt sie, bleibt der Grund einfach dunkel.
 </p>
 
 <script>
@@ -61,6 +74,8 @@ async function start () {
   window.addEventListener('resize', () => { massnehmen(); });
   el('rahmen').addEventListener('change', e =>
     document.querySelectorAll('.flaeche').forEach(k => k.classList.toggle('kalibrierung', e.target.checked)));
+  el('umriss').addEventListener('change', e =>
+    buehne.classList.toggle('ohneUmriss', !e.target.checked));
   schleife();
 }
 
