@@ -52,10 +52,12 @@
   .planzeile .nr{color:var(--leise);font-variant-numeric:tabular-nums}
   .planzeile input{background:var(--grund);color:var(--text);border:1px solid var(--rand);
     border-radius:9px;padding:8px 10px;font:inherit;font-variant-numeric:tabular-nums;width:5.6rem;text-align:center}
+  /* Eigene Namen mit Vorsilbe: ein schlichtes .weg oder .jetzt kollidiert mit
+     den Knopfklassen weiter unten und faerbt die Zelle rot ein. */
   .planzeile .lage{font-size:.8rem;color:var(--leise)}
-  .planzeile .lage.jetzt{color:var(--gut);font-weight:650}
-  .planzeile .lage.weg{color:#6b748b}
-  .planzeile .lage.verpasst{color:var(--gold)}
+  .planzeile .lage-jetzt{color:var(--gut);font-weight:650}
+  .planzeile .lage-vorbei{color:#6b748b}
+  .planzeile .lage-verpasst{color:var(--gold)}
   .planzeile .weck{background:none;border:0;color:var(--leise);font:inherit;cursor:pointer;padding:6px 10px;border-radius:8px}
   .planzeile .weck:hover{color:var(--warn)}
   .planzeile.laeuftgerade{background:rgba(95,208,138,.06)}
@@ -747,7 +749,6 @@ function spielbalkenZeichnen () {
   } else if (s.kommend) {
     zeigStart = true;
     const bis = (s.kommend.startStempel - jetzt) / 1000;
-    const laenge = Math.max(0, Math.round((s.kommend.endeStempel - jetzt) / 60000));
     if (bis < 0) {
       klasse = 'faellig';
       text = 'Runde ' + s.kommend.nr + ' überfällig seit <span class="uhr">' + dauerText(bis)
@@ -756,7 +757,13 @@ function spielbalkenZeichnen () {
       text = 'Nächste Runde ' + s.kommend.nr + ' in <span class="uhr">' + dauerText(bis)
         + '</span> — geplant ' + s.kommend.geplantStart + ' bis ' + s.kommend.geplantEnde;
     }
-    startText = 'Runde ' + s.kommend.nr + ' starten (' + laenge + ' min)';
+    // Die Restlaenge steht NUR auf dem Knopf, wenn sie eine Warnung ist: ab dem
+    // geplanten Start. Vorher waere sie irrefuehrend — wer zwanzig Minuten zu
+    // frueh hinschaut, laese dort "49 min", obwohl die Runde 29 dauern soll,
+    // weil bis zum festen Ende eben noch 49 Minuten sind. Man will ja nicht
+    // jetzt starten. Also: vorher nur der nackte Knopf.
+    startText = 'Runde ' + s.kommend.nr + ' starten'
+      + (bis <= 0 ? ' (noch ' + Math.max(0, Math.round((s.kommend.endeStempel - jetzt) / 60000)) + ' min)' : '');
   } else {
     text = 'Keine weitere Runde geplant.';
   }
@@ -774,8 +781,15 @@ async function spielStarten () {
   // Das Ende bleibt, wo es geplant ist — ein spaeter Start verkuerzt die Runde.
   // Genau deshalb steht die Restlaenge auf dem Knopf und wird ab hier gefragt:
   // das soll man beim Klicken sehen und nicht hinterher merken.
-  const laenge = Math.max(0, Math.round((k.endeStempel - serverJetzt()) / 60000));
-  if (laenge < 10 && !confirm('Runde ' + k.nr + ' läuft dann nur noch ' + laenge
+  const jetzt = serverJetzt();
+  const laenge = Math.max(0, Math.round((k.endeStempel - jetzt) / 60000));
+  const bis = Math.round((k.startStempel - jetzt) / 60000);
+  // Zu frueh ist genauso heikel wie zu spaet: die Fassade zeigt dann
+  // Botschaften, waehrend vorne noch etwas anderes laeuft.
+  if (bis >= 2 && !confirm('Der geplante Start ist erst um ' + k.geplantStart
+      + ', also in ' + bis + ' Minuten.\n\nRunde ' + k.nr + ' trotzdem jetzt starten? '
+      + 'Sie läuft dann ' + laenge + ' Minuten, das Ende ' + k.geplantEnde + ' bleibt stehen.')) return;
+  if (bis < 2 && laenge < 10 && !confirm('Runde ' + k.nr + ' läuft dann nur noch ' + laenge
       + ' Minuten — das Ende ' + k.geplantEnde + ' bleibt stehen.\n\nTrotzdem starten?')) return;
   const antwort = await fetch('/api/moderation/session-starten', {
     method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}'
@@ -836,10 +850,10 @@ function planZu (text) {
 }
 
 function planLage (z, s) {
-  if (z.abgebrochen) return { text: 'abgebrochen', art: 'weg' };
-  if (z.start !== null && z.ende !== null && z.ende > s.zeit) return { text: 'läuft gerade', art: 'jetzt' };
-  if (z.gelaufen) return { text: 'gelaufen', art: 'weg' };
-  if (z.verpasst) return { text: 'nicht gestartet', art: 'verpasst' };
+  if (z.abgebrochen) return { text: 'abgebrochen', art: 'lage-vorbei' };
+  if (z.start !== null && z.ende !== null && z.ende > s.zeit) return { text: 'läuft gerade', art: 'lage-jetzt' };
+  if (z.gelaufen) return { text: 'gelaufen', art: 'lage-vorbei' };
+  if (z.verpasst) return { text: 'nicht gestartet', art: 'lage-verpasst' };
   return null;
 }
 
@@ -855,7 +869,7 @@ function planZeichnen () {
   }
   planZeilen.forEach((z, i) => {
     const zeile = document.createElement('div');
-    zeile.className = 'planzeile' + (z.lage && z.lage.art === 'jetzt' ? ' laeuftgerade' : '');
+    zeile.className = 'planzeile' + (z.lage && z.lage.art === 'lage-jetzt' ? ' laeuftgerade' : '');
 
     const nr = document.createElement('span');
     nr.className = 'nr';

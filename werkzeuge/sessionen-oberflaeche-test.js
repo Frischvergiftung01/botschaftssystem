@@ -90,7 +90,10 @@ async function balkenText (seite) {
     const text = await balkenText(seite);
     pruefe('der Balken kennt jetzt die naechste Runde', /Runde 1/.test(text), text);
     pruefe('der Startknopf ist da', await seite.locator('#spielStart').isVisible());
-    pruefe('er nennt die Restlaenge', /min\)/.test(await seite.locator('#spielStart').textContent()),
+    // Der geplante Start liegt hier schon hinter uns, also ist die Restlaenge
+    // die Warnung, um die es geht — und gehoert auf den Knopf.
+    pruefe('ueberfaellig: er nennt die Restlaenge',
+      /\(noch \d+ min\)/.test(await seite.locator('#spielStart').textContent()),
       await seite.locator('#spielStart').textContent());
   }
 
@@ -124,6 +127,35 @@ async function balkenText (seite) {
       await seite.locator('#planSpeichern.offen').count() === 0);
     const nachher = await balkenText(seite);
     pruefe('und der Balken zieht nach', nachher.includes(neuerAnfang), nachher + ' erwartet ' + neuerAnfang);
+  }
+
+  console.log('\nVor dem geplanten Start steht keine Zahl auf dem Knopf');
+  {
+    // Der gemeldete Fall: 20 Minuten zu frueh stand "49 min" auf dem Knopf,
+    // obwohl die Runde 29 dauern soll. Rechnerisch stimmte das — bis zum festen
+    // Ende sind es dann eben 49 — als Anzeige war es irrefuehrend.
+    const jetzt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const spaeter = new Date(jetzt.getTime() + 50 * 60000);
+    const bis = String(spaeter.getHours()).padStart(2, '0') + ':' + String(spaeter.getMinutes()).padStart(2, '0');
+    const anfang = new Date(jetzt.getTime() + 20 * 60000);
+    const von = String(anfang.getHours()).padStart(2, '0') + ':' + String(anfang.getMinutes()).padStart(2, '0');
+
+    // Plan auf eine einzige Runde eindampfen. Sonst sortiert das Speichern die
+    // Zeilen nach Anfangszeit um, und "die naechste Runde" waere eine andere
+    // als die gerade getippte.
+    let uebrig = await seite.locator('.planzeile').count();
+    while (uebrig > 1) { await seite.click('.planzeile .weck >> nth=0'); uebrig--; }
+    await seite.fill('.planzeile input >> nth=0', von);
+    await seite.fill('.planzeile input >> nth=1', bis);
+    await seite.click('#planSpeichern');
+    await seite.waitForFunction(() => /Runden gespeichert/.test(document.getElementById('planStand').textContent));
+
+    const knopf = await seite.locator('#spielStart').textContent();
+    pruefe('kein Klammerwert, solange der Start in der Zukunft liegt',
+      !/\(/.test(knopf), knopf);
+    const balken = await balkenText(seite);
+    pruefe('der Balken nennt weiterhin den Plan',
+      balken.includes(von) && balken.includes(bis), balken);
   }
 
   console.log('\nStandzeit laesst sich im Betrieb verstellen');
@@ -163,6 +195,22 @@ async function balkenText (seite) {
 
   console.log('\nStarten und abbrechen');
   {
+    // Zwei Runden herstellen: die erste faellig, die zweite danach — sonst
+    // gibt es nach dem Abbruch keine naechste, auf die der Balken zeigen kann.
+    const jetzt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Europe/Berlin' }));
+    const uhr = min => {
+      const d = new Date(jetzt.getTime() + min * 60000);
+      return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    };
+    while (await seite.locator('.planzeile').count() > 0) await seite.click('.planzeile .weck >> nth=0');
+    for (let i = 0; i < 2; i++) await seite.click('#zeileDazu');
+    await seite.fill('.planzeile input >> nth=0', uhr(-5));
+    await seite.fill('.planzeile input >> nth=1', uhr(25));
+    await seite.fill('.planzeile input >> nth=2', uhr(40));
+    await seite.fill('.planzeile input >> nth=3', uhr(60));
+    await seite.click('#planSpeichern');
+    await seite.waitForFunction(() => /2 Runden gespeichert/.test(document.getElementById('planStand').textContent));
+
     await seite.click('#spielStart');
     await seite.waitForFunction(() => /läuft/.test(document.getElementById('spielLage').textContent));
     const text = await balkenText(seite);
@@ -181,6 +229,16 @@ async function balkenText (seite) {
     await seite.waitForFunction(() => /Nächste Runde/.test(document.getElementById('spielLage').textContent));
     pruefe('nach dem Abbruch steht die naechste an', /Runde 2/.test(await balkenText(seite)),
       await balkenText(seite));
+
+    // Die Lagespalte hat sich frueher die Knopffarbe eingefangen (.weg gehoert
+    // dem Ablehnen-Knopf) und stand als roter Balken quer in der Zeile.
+    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.waitForTimeout(400);
+    const lage = seite.locator('.planzeile .lage').first();
+    pruefe('die Zeile ist als abgebrochen vermerkt',
+      /abgebrochen/.test(await lage.textContent()), await lage.textContent());
+    const grund = await lage.evaluate(e => getComputedStyle(e).backgroundColor);
+    pruefe('ohne eingefangenen Hintergrund', /rgba\(0, 0, 0, 0\)|transparent/.test(grund), grund);
   }
 
   console.log('\nDie Moderation selbst ist unberuehrt');
