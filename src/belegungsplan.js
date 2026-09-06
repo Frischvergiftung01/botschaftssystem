@@ -70,6 +70,14 @@ function einsortieren (liste, eintrag) {
  * @param {number} lage.horizontMs wie weit nach vorn gerechnet wird
  * @param {number} [lage.endeMs] Nachschubschluss der Session: danach wird
  *   nichts mehr belegt, also auch nichts mehr gebucht
+ * @param {Array} [lage.gebucht] bereits vergebene, noch nicht abgearbeitete
+ *   Einträge. Sie werden NICHT neu gerechnet, sondern nur eingefaltet — der
+ *   Plan wächst hinten weiter. Das ist der Grund, warum eine einmal gegebene
+ *   Ortsangabe hält: würde alle paar Minuten alles neu verteilt, stünde die
+ *   Botschaft, für die eben noch „Säule Mitte 04" angesagt war, plötzlich
+ *   woanders, und die Auskunft wäre wertlos.
+ * @returns {{erstelltAm:number, reichtBis:number, eintraege:Array}} nur die
+ *   NEUEN Einträge; die eingefalteten kommen nicht noch einmal zurück.
  */
 function bauen (lage) {
   const { zustand, jetzt, standzeitMs, horizontMs } = lage;
@@ -89,6 +97,32 @@ function bauen (lage) {
     if (f.botschaftId !== null && f.ende > jetzt) belegtBis.set(f.botschaftId, f.ende);
   }
 
+  // Schon Gebuchtes einfalten: die Flächen sind bis dahin besetzt, die
+  // Botschaften bis dahin vergeben, und die Zähler zählen es mit.
+  const schonGezeigt = new Map();     // botschaftId -> wie oft im Plan gebucht
+  const zuletztGebucht = new Map();   // botschaftId -> spätester Start
+  let letzterGebuchterWechsel = -Infinity;
+  const spaetesteJeFlaeche = new Map();
+  for (const e of (lage.gebucht || [])) {
+    frei.set(e.flaeche, Math.max(frei.get(e.flaeche) || jetzt, e.ende));
+    const bisher = spaetesteJeFlaeche.get(e.flaeche);
+    if (!bisher || e.start > bisher.start) spaetesteJeFlaeche.set(e.flaeche, e);
+    if (e.botschaftId !== null) {
+      belegtBis.set(e.botschaftId, Math.max(belegtBis.get(e.botschaftId) || 0, e.ende));
+      schonGezeigt.set(e.botschaftId, (schonGezeigt.get(e.botschaftId) || 0) + 1);
+      zuletztGebucht.set(e.botschaftId, Math.max(zuletztGebucht.get(e.botschaftId) || 0, e.start));
+    }
+    if (e.hinweisId !== null) {
+      schonGezeigt.set('h' + e.hinweisId, (schonGezeigt.get('h' + e.hinweisId) || 0) + 1);
+      zuletztGebucht.set('h' + e.hinweisId, Math.max(zuletztGebucht.get('h' + e.hinweisId) || 0, e.start));
+    }
+    if (e.start > letzterGebuchterWechsel) letzterGebuchterWechsel = e.start;
+  }
+  for (const [nr, e] of spaetesteJeFlaeche) {
+    zuletztDort.set(nr, e.botschaftId);
+    zuletztDurchsage.set(nr, e.hinweisId);
+  }
+
   const flaecheNach = new Map(FLAECHEN.map(f => [f.nr, f]));
 
   // Vorrat mit mitgeführten Zählern: im Plan gilt eine Botschaft als gezeigt,
@@ -96,22 +130,22 @@ function bauen (lage) {
   const vorrat = lage.vorrat.map(b => ({
     id: b.id,
     text: b.name ? `${b.text} — ${b.name}` : b.text,
-    anzahl: b.anzahl_anzeigen || 0,
-    zuletzt: b.zuletzt_gezeigt || 0,
+    anzahl: (b.anzahl_anzeigen || 0) + (schonGezeigt.get(b.id) || 0),
+    zuletzt: Math.max(b.zuletzt_gezeigt || 0, zuletztGebucht.get(b.id) || 0),
     erstellt: b.erstellt_am || 0
   })).sort(vorne);
 
   const durchsagen = (lage.hinweise || []).map(h => ({
     id: h.id,
     text: h.text,
-    anzahl: h.anzahl_anzeigen || 0,
-    zuletzt: h.zuletzt_gezeigt || 0,
+    anzahl: (h.anzahl_anzeigen || 0) + (schonGezeigt.get('h' + h.id) || 0),
+    zuletzt: Math.max(h.zuletzt_gezeigt || 0, zuletztGebucht.get('h' + h.id) || 0),
     erstellt: h.nr
   })).sort(vorne);
 
   // Der Scheduler lässt nie zwei Flächen im selben Augenblick wechseln.
   const mindestabstand = Math.max(200, Math.round(standzeitMs / FLAECHEN.length / 2));
-  let letzterWechsel = -Infinity;
+  let letzterWechsel = letzterGebuchterWechsel;
 
   const eintraege = [];
   const grenze = FLAECHEN.length * (Math.ceil(horizontMs / standzeitMs) + 2);
@@ -200,4 +234,45 @@ function naechsterAuf (plan, flaeche, ab = 0) {
   return treffer;
 }
 
-module.exports = { bauen, naechsterFuer, naechsterAuf };
+/**
+ * Nimmt Buchungen bestimmter Botschaften aus dem Plan — nach einem
+ * Moderationseingriff. Es wird bewusst NICHT neu gerechnet: die Lücke füllt
+ * der Scheduler im Rückfall, und alle übrigen Zusagen bleiben stehen.
+ * @returns {number} Anzahl gestrichener Buchungen
+ */
+function streichen (plan, ids) {
+  if (!plan) return 0;
+  const menge = new Set([...ids].map(Number));
+  const vorher = plan.eintraege.length;
+  plan.eintraege = plan.eintraege.filter(e => e.botschaftId === null || !menge.has(e.botschaftId));
+  return vorher - plan.eintraege.length;
+}
+
+/** Buchungen von Hinweisen streichen — nach dem Herausnehmen eines Platzes. */
+function durchsagenStreichen (plan) {
+  if (!plan) return 0;
+  const vorher = plan.eintraege.length;
+  plan.eintraege = plan.eintraege.filter(e => e.hinweisId === null);
+  return vorher - plan.eintraege.length;
+}
+
+/**
+ * Wie weit der Plan noch nach vorn reicht — gemessen an der SCHWAECHSTEN
+ * Fläche, nicht am Gesamtbild. Eine einzelne leergeräumte Fläche (etwa nach
+ * dem Umschalten der Hinweise) würde sonst im Durchschnitt untergehen und
+ * bekäme keine Buchung mehr; sie fiele still in den Rückfall zurück, und die
+ * Auskunft für diese Fläche wäre weg.
+ */
+function reichweite (plan, jetzt = Date.now()) {
+  if (!plan || !plan.eintraege.length) return 0;
+  const bis = new Map();
+  for (const e of plan.eintraege) {
+    bis.set(e.flaeche, Math.max(bis.get(e.flaeche) || 0, e.start));
+  }
+  if (bis.size < FLAECHEN.length) return 0;   // eine Fläche ganz ohne Buchung
+  let kleinste = Infinity;
+  for (const w of bis.values()) if (w < kleinste) kleinste = w;
+  return Math.max(0, kleinste - jetzt);
+}
+
+module.exports = { bauen, naechsterFuer, naechsterAuf, streichen, durchsagenStreichen, reichweite };

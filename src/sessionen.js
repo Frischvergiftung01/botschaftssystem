@@ -123,6 +123,17 @@ function nachschubErlaubt (jetzt = Date.now()) {
   return jetzt < l.ende - einstellungen.standzeit() * 1000;
 }
 
+/**
+ * Zeitpunkt, ab dem nichts mehr nachgeladen wird — Sessionende minus eine
+ * Standzeit. Der Belegungsplan bucht nicht darueber hinaus. Ohne Plan des
+ * Abends gibt es keine Grenze.
+ */
+function nachschubBis () {
+  if (!geplant()) return null;
+  const l = laufende();
+  return l ? l.ende - einstellungen.standzeit() * 1000 : null;
+}
+
 // ------------------------------------------------------------------ Aendern
 
 /**
@@ -284,5 +295,5 @@ function stand (jetzt = Date.now()) {
 
 module.exports = {
   stand, speichern, starten, abbrechen, laufende, naechste, geplant,
-  nachschubErlaubt, vergessen, alsUhrzeit, ausUhrzeit, heuteUm
+  nachschubErlaubt, nachschubBis, vergessen, alsUhrzeit, ausUhrzeit, heuteUm
 };

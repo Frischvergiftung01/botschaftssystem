@@ -7,7 +7,12 @@
 const cfg = require('./config');
 const { abfragen } = require('./db');
 
-const SCHLUESSEL = { autoFreigabe: 'auto_freigabe', nachschub: 'nachschub' };
+// `belegungsplan` ist der Notausstieg fuer den Umbau: aus heisst, der
+// Scheduler entscheidet wieder erst im Moment des Wechsels, so wie vor dem
+// Plan. Die Fassade laeuft dann normal weiter, nur die Ortsangabe auf der
+// Statusseite faellt weg. Wer am Abend Zweifel hat, legt den Schalter um
+// statt einen Redeploy anzustossen.
+const SCHLUESSEL = { autoFreigabe: 'auto_freigabe', nachschub: 'nachschub', belegungsplan: 'belegungsplan' };
 const STANDZEIT = 'standzeit';
 const STANDZEIT_MIN = 5;
 const STANDZEIT_MAX = 300;
@@ -15,7 +20,8 @@ const STANDZEIT_MAX = 300;
 function vorgabe () {
   return {
     autoFreigabe: cfg.autoFreigabe, // sauberes FREI direkt in die Anzeige?
-    nachschub: true                 // teilt der Scheduler neue Botschaften zu?
+    nachschub: true,                // teilt der Scheduler neue Botschaften zu?
+    belegungsplan: true             // wird im Voraus gebucht statt erst beim Wechsel?
   };
 }
 

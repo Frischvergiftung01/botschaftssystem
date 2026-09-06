@@ -29,6 +29,7 @@ const { abfragen } = require('./db');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
+const belegungsplan = require('./belegungsplan');
 
 // Laufender Zustand je Fläche — das ist genau das, was Simulator und Bridge lesen.
 const zustand = new Map();
@@ -52,6 +53,63 @@ for (const [i, f] of FLAECHEN.entries()) {
 let gestartet = false;
 let letzterWechsel = 0;
 
+// Der Belegungsplan: wer wann auf welche Fläche kommt, ein paar Minuten im
+// Voraus. Er ist eine VORSCHALTUNG, keine Ablösung — findet sich für eine
+// Fläche keine gültige Buchung, entscheidet der Scheduler wie eh und je.
+// Damit degradiert ein Fehler im Plan zur alten Funktion und nicht zu einer
+// dunklen Wand. Abschalten geht ohne Redeploy über den Schalter.
+let plan = null;
+
+function planAn () { return einstellungen.schalter().belegungsplan !== false; }
+
+/** Ganz verwerfen — nur wenn sich die Lage grob ändert (Standzeit, Leeren). */
+function planVerwerfen () { plan = null; }
+
+/** Buchungen einzelner Botschaften streichen. Der Rest der Zusagen bleibt. */
+function planStreichen (ids) { return belegungsplan.streichen(plan, ids); }
+
+/** Alle Buchungen einer Fläche streichen — etwa wenn Hinweise umgeschaltet werden. */
+function planFlaecheLeeren (nr) {
+  if (!plan) return 0;
+  const vorher = plan.eintraege.length;
+  plan.eintraege = plan.eintraege.filter(e => e.flaeche !== nr);
+  return vorher - plan.eintraege.length;
+}
+
+/**
+ * Hält den Plan auf Länge. Er wird NICHT neu gerechnet, sondern hinten
+ * verlängert: eine einmal gegebene Ortsangabe soll halten. Würde alle paar
+ * Minuten alles neu verteilt, stünde die Botschaft, für die eben noch
+ * „Säule Mitte 04" angesagt war, plötzlich woanders.
+ */
+let letztesNachziehen = 0;
+
+function planPflegen (t) {
+  if (!planAn()) { plan = null; return; }
+  const horizontMs = cfg.planHorizontSekunden * 1000;
+  if (plan && belegungsplan.reichweite(plan, t) > horizontMs * 0.6) return;
+  // Bleibt eine Fläche dauerhaft unbelegbar — nichts im Vorrat passt lesbar
+  // darauf —, meldet die Reichweite immer null. Ohne diese Bremse würde dann
+  // in jedem Takt nachgerechnet.
+  if (plan && t - letztesNachziehen < 1000) return;
+  letztesNachziehen = t;
+  const neu = belegungsplan.bauen({
+    zustand,
+    vorrat: abfragen.spielbar.all(),
+    hinweise: hinweise.scharfeListe(),
+    jetzt: t,
+    standzeitMs: einstellungen.standzeit() * 1000,
+    horizontMs,
+    endeMs: sessionen.nachschubBis(),
+    gebucht: plan ? plan.eintraege : []
+  });
+  if (!plan) plan = { erstelltAm: t, eintraege: [] };
+  plan.eintraege.push(...neu.eintraege);
+}
+
+/** Der laufende Plan — für die Auskunft an den Absender. */
+function derPlan () { return plan; }
+
 function jetzt () { return Date.now(); }
 
 /**
@@ -67,8 +125,11 @@ function nachladenErlaubt () {
 
 /** Eine Runde: jede abgelaufene Fläche bekommt eine neue Botschaft. */
 function takt () {
-  if (!nachladenErlaubt()) return; // angehalten: Laufendes läuft aus
+  // Angehalten heißt auch: der Plan ist hinfällig. Was gebucht war, wäre nach
+  // der Pause zeitlich falsch — er wird beim Weiterlaufen neu aufgebaut.
+  if (!nachladenErlaubt()) { plan = null; return; } // Laufendes läuft aus
   const t = jetzt();
+  planPflegen(t);
   // Nie zwei Wechsel im selben Augenblick — sonst flackert die halbe Fassade auf einmal.
   const mindestabstand = Math.max(200, Math.round((einstellungen.standzeit() * 1000) / FLAECHEN.length / 2));
   for (const f of zustand.values()) {
@@ -88,6 +149,11 @@ function takt () {
  * übrigen 32 Flächen.
  */
 function belegen (f, t) {
+  // Erst die Buchung. Gilt sie nicht mehr — die Botschaft wurde inzwischen
+  // abgelehnt, der Hinweis herausgenommen —, fällt es auf den alten Weg
+  // zurück, und die Fläche bleibt keine Sekunde leer.
+  if (planAn() && ausPlanNehmen(f, t)) return true;
+
   if (f.nr === cfg.hinweisFlaeche) {
     const h = hinweise.naechster(f.hinweisId);
     if (h) return hinweisSetzen(f, h, t);
@@ -104,26 +170,65 @@ function belegen (f, t) {
     const g = groesseFuer(voll, f.breite, cfg.maxVersalhoehe);
     if (g.versalhoehe < cfg.minVersalhoehe) continue; // passt hier nicht lesbar drauf
 
-    const ende = t + einstellungen.standzeit() * 1000;
-    f.botschaftId = b.id;
-    // Zuruecksetzen, sonst gilt die Flaeche nach einem Hinweis weiter als
-    // belegt von ihm — und die Anzeige weist eine Publikumsbotschaft als
-    // Durchsage aus.
-    f.hinweisId = null;
-    f.text = voll;
-    f.absender = b.name || null;
-    f.start = t;
-    f.ende = ende;
-    f.groesse = g;
-
-    abfragen.anzeigeEintragen.run({
-      botschaft_id: b.id, flaeche: f.nr, start: t, ende,
-      versalhoehe: g.versalhoehe, schrifthoehe: g.schrifthoehe, y_versatz: g.yVersatz
-    });
-    abfragen.anzeigeGezaehlt.run(t, b.id);
-    return true;
+    return botschaftSetzen(f, b, t, g, voll);
   }
   return false;
+}
+
+/** Trägt eine Botschaft auf einer Fläche ein und schreibt sie fort. */
+function botschaftSetzen (f, b, t, g, voll) {
+  const ende = t + einstellungen.standzeit() * 1000;
+  f.botschaftId = b.id;
+  // Zuruecksetzen, sonst gilt die Flaeche nach einem Hinweis weiter als
+  // belegt von ihm — und die Anzeige weist eine Publikumsbotschaft als
+  // Durchsage aus.
+  f.hinweisId = null;
+  f.text = voll;
+  f.absender = b.name || null;
+  f.start = t;
+  f.ende = ende;
+  f.groesse = g;
+
+  abfragen.anzeigeEintragen.run({
+    botschaft_id: b.id, flaeche: f.nr, start: t, ende,
+    versalhoehe: g.versalhoehe, schrifthoehe: g.schrifthoehe, y_versatz: g.yVersatz
+  });
+  abfragen.anzeigeGezaehlt.run(t, b.id);
+  return true;
+}
+
+/**
+ * Holt die nächste Buchung dieser Fläche aus dem Plan und prüft sie gegen die
+ * Wirklichkeit. Die Buchung wird in jedem Fall verbraucht: gilt sie nicht
+ * mehr, ist sie hinfällig und darf nicht beim nächsten Wechsel wiederkommen.
+ */
+function ausPlanNehmen (f, t) {
+  if (!plan || !plan.eintraege.length) return false;
+  let i = -1;
+  for (let k = 0; k < plan.eintraege.length; k++) {
+    const e = plan.eintraege[k];
+    if (e.flaeche !== f.nr) continue;
+    if (i === -1 || e.start < plan.eintraege[i].start) i = k;
+  }
+  if (i === -1) return false;
+  const e = plan.eintraege[i];
+  plan.eintraege.splice(i, 1);
+
+  if (e.hinweisId !== null) {
+    const h = hinweise.nachId(e.hinweisId);
+    if (!h || !h.scharf || !h.text.trim()) return false;
+    return hinweisSetzen(f, h, t);
+  }
+
+  const b = abfragen.perId.get(e.botschaftId);
+  if (!b || b.status !== 'freigegeben') return false;
+  // Zweimal gleichzeitig an der Fassade geht nicht — der Plan rechnet das mit,
+  // aber ein Rückfall an anderer Stelle kann ihm zuvorgekommen sein.
+  for (const x of zustand.values()) {
+    if (x.nr !== f.nr && x.ende > t && x.botschaftId === b.id) return false;
+  }
+  if (b.id === f.botschaftId) return false;
+  return botschaftSetzen(f, b, t, e.groesse, vollerText(b));
 }
 
 /**
@@ -152,6 +257,9 @@ function hinweisSetzen (f, h, t) {
  */
 function entfernen (ids) {
   const menge = new Set([...ids].map(Number));
+  // Auch aus dem Plan nehmen: eine abgelehnte Botschaft darf nicht in drei
+  // Minuten aus einer alten Buchung wieder auftauchen.
+  planStreichen(menge);
   let geraeumt = 0;
   for (const f of zustand.values()) {
     if (f.botschaftId === null || !menge.has(f.botschaftId)) continue;
@@ -163,6 +271,7 @@ function entfernen (ids) {
 
 /** Alle Flächen räumen — nach dem Leeren der Datenbank. */
 function alleEntfernen () {
+  planVerwerfen();
   for (const f of zustand.values()) raeumen(f);
 }
 
@@ -207,4 +316,7 @@ function anzeige () {
   }));
 }
 
-module.exports = { starten, takt, anzeige, zustand, vollerText, entfernen, alleEntfernen, nachladenErlaubt };
+module.exports = {
+  starten, takt, anzeige, zustand, vollerText, entfernen, alleEntfernen, nachladenErlaubt,
+  derPlan, planVerwerfen, planStreichen, planFlaecheLeeren, planPflegen, planAn
+};

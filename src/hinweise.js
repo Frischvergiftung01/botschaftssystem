@@ -80,6 +80,16 @@ function naechster (zuletztId = null) {
   return sortiert[0];
 }
 
+/** Die scharfen Plaetze als Rohzeilen — fuer den Belegungsplan. */
+function scharfeListe () {
+  return alle().filter(h => h.scharf && h.text.trim());
+}
+
+/** Ein Platz nach seiner id. Der Plan bucht ids, nicht Nummern. */
+function nachId (id) {
+  return alle().find(h => h.id === id) || null;
+}
+
 /** Zaehlwerk nach einer Einblendung. */
 function gezeigt (id, zeit) {
   abfragen.hinweisGezeigt.run({ id, zeit });
@@ -174,5 +184,5 @@ function stand () {
 
 module.exports = {
   stand, speichern, scharfSetzen, naechster, gezeigt, scharfeVorhanden,
-  sicherstellen, vergessen, optik, FLAECHE
+  scharfeListe, nachId, sicherstellen, vergessen, optik, FLAECHE
 };

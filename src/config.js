@@ -67,6 +67,12 @@ module.exports = {
   hinweisPlaetze: Number(process.env.HINWEIS_PLAETZE || 5),
   maxZeichenHinweis: Number(process.env.MAX_ZEICHEN_HINWEIS || 120),
 
+  // Belegungsplan. Wie weit im Voraus gebucht wird — daraus speist sich die
+  // Ortsangabe auf der Statusseite. Zu kurz: der Absender erfaehrt zu spaet,
+  // wo er hinlaufen soll. Zu lang: der Plan veraltet schneller, als er
+  // nachgerechnet wird.
+  planHorizontSekunden: Number(process.env.PLAN_HORIZONT || 180),
+
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),
   blendeSekunden: 0.35,          // muss zum Patch passen (Smooth-Knoten)

@@ -241,7 +241,9 @@ fastify.post('/api/moderation/entscheiden', async (req, reply) => {
 
 fastify.post('/api/moderation/schalter', async (req, reply) => {
   const name = String(req.body?.name ?? '');
-  if (!['autoFreigabe', 'nachschub'].includes(name)) return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
+  if (!['autoFreigabe', 'nachschub', 'belegungsplan'].includes(name)) {
+    return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
+  }
   const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
   req.log.warn({ name, wert: Boolean(req.body?.wert) }, 'Schalter umgelegt');
   return { schalter: stand };
@@ -259,6 +261,7 @@ fastify.post('/api/moderation/hinweise', async (req, reply) => {
   if (zeilen.length > 20) return reply.code(400).send({ fehler: 'Hoechstens 20 Plaetze.' });
   try {
     hinweise.speichern(zeilen);
+    scheduler.planFlaecheLeeren(cfg.hinweisFlaeche);
     return hinweise.stand();
   } catch (e) {
     return reply.code(400).send({ fehler: e.message });
@@ -268,6 +271,9 @@ fastify.post('/api/moderation/hinweise', async (req, reply) => {
 fastify.post('/api/moderation/hinweis-scharf', async (req, reply) => {
   try {
     const stand = hinweise.scharfSetzen(req.body?.nr, Boolean(req.body?.wert));
+    // Die Buchungen der Stirnseite Mitte gelten nicht mehr: dort wechselt
+    // gerade, wer sie bekommt.
+    scheduler.planFlaecheLeeren(cfg.hinweisFlaeche);
     req.log.warn({ nr: req.body?.nr, wert: Boolean(req.body?.wert) }, 'Hinweis geschaltet');
     return stand;
   } catch (e) {
@@ -287,6 +293,7 @@ fastify.post('/api/moderation/sessionen', async (req, reply) => {
   if (zeilen.length > 40) return reply.code(400).send({ fehler: 'Hoechstens 40 Runden.' });
   try {
     const n = sessionen.speichern(zeilen);
+    scheduler.planVerwerfen();   // ein verschobenes Ende verschiebt den Nachschubschluss
     req.log.info({ zeilen: n }, 'Spielzeiten gespeichert');
     return sessionen.stand();
   } catch (e) {
@@ -319,6 +326,9 @@ fastify.post('/api/moderation/session-abbrechen', async (req, reply) => {
 fastify.post('/api/moderation/standzeit', async (req, reply) => {
   try {
     const sekunden = einstellungen.standzeitSetzen(req.body?.sekunden);
+    // Der Belegungsplan rechnet mit der Standzeit — mit einer neuen sind alle
+    // gebuchten Zeiten falsch. Also verwerfen und frisch aufbauen lassen.
+    scheduler.planVerwerfen();
     req.log.warn({ sekunden }, 'Standzeit geaendert');
     return { standzeitSekunden: sekunden };
   } catch (e) {

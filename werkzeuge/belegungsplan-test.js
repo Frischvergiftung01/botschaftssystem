@@ -229,6 +229,106 @@ console.log('\nNachschlagen');
   pruefe('ohne Plan gibt null', plan.naechsterFuer(null, 1, T0) === null);
 }
 
+console.log('\nDer Plan waechst hinten weiter, statt neu gerechnet zu werden');
+{
+  // Genau das haelt die Zusage: wer "Saeule Mitte 04 in zwei Minuten" gehoert
+  // hat, soll sie dort auch bekommen, wenn zwischendurch verlaengert wird.
+  const zustand = leererZustand();
+  const vorrat = botschaften(120);
+  const erst = plan.bauen({ zustand, vorrat, hinweise: [], jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 60000 });
+  const weiter = plan.bauen({
+    zustand, vorrat, hinweise: [], jetzt: T0 + 20000, standzeitMs: STANDZEIT,
+    horizontMs: 180000, gebucht: erst.eintraege
+  });
+
+  pruefe('es kommt etwas dazu', weiter.eintraege.length > 0, weiter.eintraege.length);
+  const alteSchluessel = new Set(erst.eintraege.map(e => e.flaeche + '@' + e.start));
+  pruefe('nichts Altes kommt doppelt zurueck',
+    weiter.eintraege.every(e => !alteSchluessel.has(e.flaeche + '@' + e.start)));
+  pruefe('das Neue liegt hinter dem Alten',
+    weiter.eintraege.every(n => erst.eintraege.every(a => a.flaeche !== n.flaeche || n.start >= a.ende)));
+
+  const zusammen = [...erst.eintraege, ...weiter.eintraege];
+  const nachId = new Map();
+  for (const e of zusammen) {
+    if (e.botschaftId === null) continue;
+    if (!nachId.has(e.botschaftId)) nachId.set(e.botschaftId, []);
+    nachId.get(e.botschaftId).push(e);
+  }
+  let ueberschneidungen = 0;
+  for (const liste of nachId.values()) {
+    liste.sort((a, b) => a.start - b.start);
+    for (let i = 1; i < liste.length; i++) if (liste[i].start < liste[i - 1].ende) ueberschneidungen++;
+  }
+  pruefe('auch zusammen steht keine Botschaft zweimal gleichzeitig', ueberschneidungen === 0, ueberschneidungen);
+
+  const zahlen = [...nachId.values()].map(l => l.length);
+  pruefe('die Verteilung bleibt gleichmaessig', Math.max(...zahlen) - Math.min(...zahlen) <= 1,
+    { min: Math.min(...zahlen), max: Math.max(...zahlen) });
+
+  const nachFlaeche = new Map();
+  for (const e of zusammen) {
+    if (!nachFlaeche.has(e.flaeche)) nachFlaeche.set(e.flaeche, []);
+    nachFlaeche.get(e.flaeche).push(e);
+  }
+  let wiederholungen = 0;
+  for (const liste of nachFlaeche.values()) {
+    liste.sort((a, b) => a.start - b.start);
+    for (let i = 1; i < liste.length; i++) {
+      if (liste[i].botschaftId !== null && liste[i].botschaftId === liste[i - 1].botschaftId) wiederholungen++;
+    }
+  }
+  pruefe('auch ueber die Naht hinweg keine Wiederholung', wiederholungen === 0, wiederholungen);
+}
+
+console.log('\nNeu freigegebene Botschaften kommen in den Nachschlag');
+{
+  const zustand = leererZustand();
+  const alt = botschaften(40);
+  const erst = plan.bauen({ zustand, vorrat: alt, hinweise: [], jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 60000 });
+  // Eine frische Botschaft kommt dazu — sie war noch nie dran und muss deshalb
+  // in der Verlaengerung weit vorn stehen.
+  const frisch = { id: 999, text: 'Frisch freigegeben', name: null,
+    anzahl_anzeigen: 0, zuletzt_gezeigt: null, erstellt_am: T0 + 1000 };
+  const weiter = plan.bauen({
+    zustand, vorrat: [...alt, frisch], hinweise: [], jetzt: T0 + 10000,
+    standzeitMs: STANDZEIT, horizontMs: 180000, gebucht: erst.eintraege
+  });
+  const ihre = weiter.eintraege.filter(e => e.botschaftId === 999);
+  pruefe('sie wird gebucht', ihre.length > 0, ihre.length);
+  const wann = Math.min(...ihre.map(e => e.start));
+  pruefe('und zwar gleich am Anfang der Verlaengerung',
+    wann - T0 < 90000, Math.round((wann - T0) / 1000) + ' s');
+}
+
+console.log('\nStreichen nach einem Moderationseingriff');
+{
+  const p = plan.bauen({
+    zustand: leererZustand(), vorrat: botschaften(60), hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 120000
+  });
+  const vorher = p.eintraege.length;
+  const betroffen = p.eintraege.filter(e => e.botschaftId === 7).length;
+  pruefe('Botschaft 7 ist ueberhaupt gebucht', betroffen > 0, betroffen);
+  const weg = plan.streichen(p, [7]);
+  pruefe('die richtige Zahl gestrichen', weg === betroffen, { weg, betroffen });
+  pruefe('sie steht nirgends mehr', p.eintraege.every(e => e.botschaftId !== 7));
+  pruefe('alles andere bleibt stehen', p.eintraege.length === vorher - betroffen);
+  pruefe('ohne Plan tut streichen nichts', plan.streichen(null, [7]) === 0);
+}
+
+console.log('\nReichweite');
+{
+  const p = plan.bauen({
+    zustand: leererZustand(), vorrat: botschaften(60), hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 120000
+  });
+  const r = plan.reichweite(p, T0);
+  pruefe('reicht ungefaehr bis zum Horizont', r > 90000 && r <= 120000, Math.round(r / 1000) + ' s');
+  pruefe('leerer Plan reicht null weit', plan.reichweite({ eintraege: [] }, T0) === 0);
+  pruefe('ohne Plan null', plan.reichweite(null, T0) === 0);
+}
+
 console.log('\nRechenzeit');
 {
   const vorrat = botschaften(400);
