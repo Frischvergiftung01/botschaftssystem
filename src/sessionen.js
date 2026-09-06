@@ -67,29 +67,28 @@ function alsUhrzeit (minuten) {
 }
 
 // ------------------------------------------------------------------ Zustand
-// Der Scheduler fragt viermal je Sekunde, ob er nachladen darf. Deshalb wird
-// die laufende Session zwischengespeichert — wie bei den Schaltern.
+// Der Scheduler fragt viermal je Sekunde, ob er nachladen darf. Deshalb liegen
+// die Planzeilen im Zwischenspeicher — wie bei den Schaltern. Ausgewertet wird
+// jedes Mal frisch gegen die Uhr; das ist eine Handvoll Zeilen und kostet nichts.
 
-let zwischenspeicher = null;
-function vergessen () { zwischenspeicher = null; }
+let zeilenSpeicher = null;
+function vergessen () { zeilenSpeicher = null; }
 
 function alleZeilen () {
-  return abfragen.sessionenListe.all();
+  if (!zeilenSpeicher) zeilenSpeicher = abfragen.sessionenListe.all();
+  return zeilenSpeicher;
 }
+
+/** Steht ueberhaupt ein Plan? Ohne Plan gelten keine Spielzeiten. */
+function geplant () { return alleZeilen().length > 0; }
 
 /**
  * Die laufende Session, oder null.
  * Laufend heisst: gestartet, nicht abgebrochen, und das Ende ist noch nicht da.
  */
-function laufende () {
-  if (zwischenspeicher !== undefined && zwischenspeicher !== null) {
-    if (Date.now() < zwischenspeicher.ende) return zwischenspeicher;
-    zwischenspeicher = null;
-  }
-  const jetzt = Date.now();
-  const z = alleZeilen().find(s => s.start !== null && s.ende !== null && s.ende > jetzt && !s.abgebrochen);
-  zwischenspeicher = z || null;
-  return zwischenspeicher;
+function laufende (jetzt = Date.now()) {
+  return alleZeilen().find(s =>
+    s.start !== null && s.ende !== null && s.ende > jetzt && !s.abgebrochen) || null;
 }
 
 /**
@@ -105,12 +104,20 @@ function naechste () {
 }
 
 /**
- * Darf der Scheduler nachladen? Genau dann, wenn eine Session laeuft und bis
- * zu ihrem Ende noch eine volle Standzeit passt. Die letzte Botschaft geht
- * damit punktgenau zum eingetragenen Ende aus.
+ * Darf der Scheduler nachladen?
+ *
+ * Steht kein Plan, laeuft das System wie vor den Spielzeiten einfach durch.
+ * Das ist die wichtige Zeile in dieser Datei: ohne sie waere ein Deploy an
+ * einem Tag ohne eingetragene Zeiten eine dunkle Wand, und an Probetagen
+ * muesste man Zeiten pflegen, die niemanden interessieren.
+ *
+ * Steht ein Plan, dann genau solange eine Runde laeuft und bis zu ihrem Ende
+ * noch eine volle Standzeit passt — so ist die letzte Botschaft punktgenau
+ * zum eingetragenen Ende ausgelaufen.
  */
 function nachschubErlaubt (jetzt = Date.now()) {
-  const l = laufende();
+  if (!geplant()) return true;
+  const l = laufende(jetzt);
   if (!l) return false;
   return jetzt < l.ende - cfg.standzeitSekunden * 1000;
 }
@@ -125,20 +132,25 @@ function nachschubErlaubt (jetzt = Date.now()) {
  * Abends eine spaetere Runde verschiebt, soll die laufende nicht verlieren.
  */
 const speichernTx = db.transaction((zeilen) => {
+  const jetzt = Date.now();
   const alt = new Map(alleZeilen().map(s => [s.nr, s]));
   abfragen.sessionenLeeren.run();
   let n = 0;
   for (const [i, z] of zeilen.entries()) {
     const nr = i + 1;
     const frueher = alt.get(nr);
+    // Nur eine GERADE LAUFENDE Runde zieht ein geaendertes Ende mit — genau
+    // dafuer schiebt man am Abend eine Zeit. Eine bereits gelaufene bleibt,
+    // wie sie war: sonst weckt eine spaetere Planaenderung eine
+    // abgeschlossene Runde wieder auf, und die Wand geht unvermittelt an.
+    const laeuftGerade = Boolean(frueher && frueher.start !== null &&
+      !frueher.abgebrochen && frueher.ende !== null && frueher.ende > jetzt);
     abfragen.sessionEinfuegen.run({
       nr,
       geplant_start: z.geplantStart,
       geplant_ende: z.geplantEnde,
-      // Laeuft die Zeile gerade, zieht das neue Ende mit — genau dafuer aendert
-      // man am Abend eine Zeit. Der Start bleibt, wie er war.
       start: frueher ? frueher.start : null,
-      ende: frueher && frueher.start !== null ? heuteUm(z.geplantEnde) : null,
+      ende: laeuftGerade ? heuteUm(z.geplantEnde, jetzt) : (frueher ? frueher.ende : null),
       abgebrochen: frueher ? frueher.abgebrochen : 0
     });
     n++;
@@ -246,7 +258,10 @@ function stand (jetzt = Date.now()) {
   }
 
   return {
-    phase: aktuell ? aktuell.phase : 'pause',
+    // ohnePlan heisst: die Spielzeiten sind gar nicht in Betrieb, das System
+    // laeuft durch. Fuer die Oberflaeche ein anderer Zustand als eine Pause
+    // zwischen zwei Runden, und er soll auch anders aussehen.
+    phase: aktuell ? aktuell.phase : (geplant() ? 'pause' : 'ohnePlan'),
     nachschubErlaubt: nachschubErlaubt(jetzt),
     aktuell,
     kommend,
@@ -256,6 +271,6 @@ function stand (jetzt = Date.now()) {
 }
 
 module.exports = {
-  stand, speichern, starten, abbrechen, laufende, naechste, nachschubErlaubt,
-  vergessen, alsUhrzeit, ausUhrzeit, heuteUm
+  stand, speichern, starten, abbrechen, laufende, naechste, geplant,
+  nachschubErlaubt, vergessen, alsUhrzeit, ausUhrzeit, heuteUm
 };

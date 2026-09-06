@@ -15,12 +15,19 @@
 // sofort von der Fassade (Ablehnen oder Sperren einer laufenden Botschaft), und
 // der Schalter `nachschub` hält die Zuteilung an, ohne den Dienst zu stoppen.
 // Der harte Abbruch ist das nicht — der passiert in Resolume an den Ebenen.
+//
+// Dazu kommen die Spielzeiten: die Mapping-Shows laufen zur vollen und halben
+// Stunde, die Minuten davor gehören den Botschaften. Nachgeladen wird deshalb
+// nur, solange eine Session läuft. Ist gar kein Plan eingetragen, verhält sich
+// alles wie vorher — sonst wäre ein Abend ohne gepflegte Zeiten eine dunkle
+// Wand, und an Probetagen will man die Zeiten nicht pflegen müssen.
 
 const cfg = require('./config');
 const { FLAECHEN } = require('./flaechen');
 const { groesseFuer } = require('./text');
 const { abfragen } = require('./db');
 const einstellungen = require('./einstellungen');
+const sessionen = require('./sessionen');
 
 // Laufender Zustand je Fläche — das ist genau das, was Simulator und Bridge lesen.
 const zustand = new Map();
@@ -45,9 +52,20 @@ let letzterWechsel = 0;
 
 function jetzt () { return Date.now(); }
 
+/**
+ * Darf jetzt nachgeladen werden? Zwei Bedingungen, und sie sind verschieden
+ * gemeint: der Handschalter ist der weiche Not-Aus der Moderation, die
+ * Spielzeit ist der Takt des Abends. Beide halten nur den Nachschub an —
+ * was steht, läuft in beiden Fällen normal aus.
+ */
+function nachladenErlaubt () {
+  if (!einstellungen.schalter().nachschub) return false;
+  return sessionen.nachschubErlaubt();
+}
+
 /** Eine Runde: jede abgelaufene Fläche bekommt eine neue Botschaft. */
 function takt () {
-  if (!einstellungen.schalter().nachschub) return; // angehalten: Laufendes läuft aus
+  if (!nachladenErlaubt()) return; // angehalten: Laufendes läuft aus
   const t = jetzt();
   // Nie zwei Wechsel im selben Augenblick — sonst flackert die halbe Fassade auf einmal.
   const mindestabstand = Math.max(200, Math.round((cfg.standzeitSekunden * 1000) / FLAECHEN.length / 2));
@@ -149,4 +167,4 @@ function anzeige () {
   }));
 }
 
-module.exports = { starten, takt, anzeige, zustand, vollerText, entfernen, alleEntfernen };
+module.exports = { starten, takt, anzeige, zustand, vollerText, entfernen, alleEntfernen, nachladenErlaubt };
