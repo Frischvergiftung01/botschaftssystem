@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="de">
 <head>
 <meta charset="utf-8">
@@ -104,7 +104,7 @@
     border-bottom:1px solid var(--rand);font-size:.85rem;color:var(--leise)}
   #rahmenkopf b{color:var(--text);font-weight:600}
   #rahmenkopf .rechts{margin-left:auto;display:flex;gap:8px}
-  #rahmen iframe{flex:1;width:100%;border:0;background:#fff}
+  #rahmen iframe{flex:1;width:100%;border:0;background:var(--grund)}
   .werkzeug{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
   .werkzeug input{background:var(--grund);color:var(--text);border:1px solid var(--rand);
     border-radius:10px;padding:10px 12px;font:inherit}
@@ -126,20 +126,7 @@
     <button class="pille" id="sNachschub">Nachschub</button>
     <button class="pille" id="abmelden">Abmelden</button>
   </div>
-</header>
-
-<div class="seiten">
-  <a href="#moderation" id="zurModeration" class="offen">Moderation</a><span>·</span>
-  <a href="/simulator" data-modus="unten">Simulator</a><span>·</span>
-  <a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span>
-  <a href="/">Eingabeseite</a><span>·</span>
-  <a href="/status">Statusseite</a><span>·</span>
-  <a href="/api/kennzahlen">Kennzahlen</a><span>·</span>
-  <a href="/api/anzeige">Anzeige (roh)</a><span>·</span>
-  <a href="/api/gesundheit">Gesundheit</a>
-</div>
-
-<nav>
+</header>>
   <button data-ansicht="uebersicht" class="aktiv">Übersicht</button>
   <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
   <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
@@ -192,6 +179,7 @@
   </section>
 </main>
 
+
 <section id="rahmen" hidden>
   <div id="rahmenkopf">
     <b id="rahmenTitel"></b>
@@ -226,7 +214,12 @@ async function start () {
     a.addEventListener('click', e => {
       e.preventDefault();
       const ziel = a.getAttribute('href');
-      if (ziel === '#moderation') return rahmenZu();
+      if (ziel === '#moderation') {
+        // Vollflächige Seite schließen; Simulator im unten-Modus nicht anfassen
+        if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
+        if (ansicht !== 'uebersicht') wechseln('uebersicht');
+        return;
+      }
       rahmenAuf(ziel, a.textContent.trim(), a, a.dataset.modus === 'unten');
     }));
   el('rahmenZu').addEventListener('click', rahmenZu);
