@@ -54,6 +54,12 @@ module.exports = {
   // Veranstaltungsabend. Am 5. November auf false stellen.
   datenbankLeerenErlaubt: process.env.DATENBANK_LEEREN !== 'false',
 
+  // Spielzeiten (Sessions).
+  // Der Dienst laeuft in Coolify und damit sehr wahrscheinlich auf UTC, die
+  // eingetragenen Uhrzeiten meinen aber Ortszeit am Koenigsbau. Ohne diese
+  // Angabe laege der ganze Abend um eine Stunde daneben.
+  zeitzone: process.env.ZEITZONE || 'Europe/Berlin',
+
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),
   blendeSekunden: 0.35,          // muss zum Patch passen (Smooth-Knoten)

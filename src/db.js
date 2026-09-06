@@ -47,6 +47,20 @@ CREATE TABLE IF NOT EXISTS anzeigen (
 CREATE INDEX IF NOT EXISTS idx_anzeigen_botschaft ON anzeigen(botschaft_id, start);
 CREATE INDEX IF NOT EXISTS idx_anzeigen_flaeche   ON anzeigen(flaeche, start);
 
+-- Die Spielzeiten des Abends (Sessions). Minuten seit Mitternacht als Plan,
+-- echte Zeitstempel sobald gestartet wurde. Dass beides in der Datenbank
+-- steht und nicht im Arbeitsspeicher, ist Absicht: eine laufende Session
+-- uebersteht so einen Neustart des Dienstes mitten am Abend.
+CREATE TABLE IF NOT EXISTS sessionen (
+  id            INTEGER PRIMARY KEY,
+  nr            INTEGER NOT NULL UNIQUE,   -- Reihenfolge des Abends, ab 1
+  geplant_start INTEGER NOT NULL,          -- Minuten seit Mitternacht, unverbindlich
+  geplant_ende  INTEGER NOT NULL,          -- Minuten seit Mitternacht, verbindlich: dann ist die Wand leer
+  start         INTEGER,                   -- echter Start, gesetzt per Knopf
+  ende          INTEGER,                   -- echtes Ende, beim Start aus geplant_ende aufgeloest
+  abgebrochen   INTEGER NOT NULL DEFAULT 0
+);
+
 -- Schalter, die im Betrieb umgelegt werden (Block 5): Auto-Freigabe, Nachschub.
 CREATE TABLE IF NOT EXISTS einstellungen (
   schluessel   TEXT PRIMARY KEY,
@@ -99,6 +113,14 @@ const abfragen = {
   statusSetzen: db.prepare('UPDATE botschaften SET status = @status, entschieden_am = @zeit WHERE id = @id'),
   alleAnzeigenLoeschen: db.prepare('DELETE FROM anzeigen'),
   alleBotschaftenLoeschen: db.prepare('DELETE FROM botschaften'),
+
+  // ---- Spielzeiten -------------------------------------------------------
+  sessionenListe: db.prepare('SELECT * FROM sessionen ORDER BY nr ASC'),
+  sessionenLeeren: db.prepare('DELETE FROM sessionen'),
+  sessionEinfuegen: db.prepare(`INSERT INTO sessionen (nr, geplant_start, geplant_ende, start, ende, abgebrochen)
+                                VALUES (@nr, @geplant_start, @geplant_ende, @start, @ende, @abgebrochen)`),
+  sessionStarten: db.prepare('UPDATE sessionen SET start = @start, ende = @ende WHERE id = @id'),
+  sessionAbbrechen: db.prepare('UPDATE sessionen SET ende = @ende, abgebrochen = 1 WHERE id = @id'),
 
   einstellungLesen: db.prepare('SELECT wert FROM einstellungen WHERE schluessel = ?'),
   einstellungSchreiben: db.prepare(`INSERT INTO einstellungen (schluessel, wert, geaendert_am)
