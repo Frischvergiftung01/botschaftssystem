@@ -40,4 +40,31 @@ saeulen(10, 'Links',  7,   30, [309, 527, 743, 965, 1179, 1401, 1620]);
 saeulen(17, 'Mitte', 10, 3616, [2836, 3054, 3270, 3492, 3706, 3928, 4148, 4362, 4580, 4800]);
 saeulen(27, 'Rechts', 7, 5960, [6013, 6231, 6447, 6669, 6883, 7105, 7325]);
 
-module.exports = { FLAECHEN, BANDHOEHE };
+/**
+ * Wo am Gebäude ist das — in Worten, die jemandem helfen, der davorsteht.
+ *
+ * "Säule Mitte 04" ist ein Name für die Technik. Wer auf dem Vorplatz steht
+ * und in drei Minuten hinschauen soll, braucht eine Richtung und einen
+ * Anhaltspunkt: links oder rechts, und woran man es erkennt.
+ */
+function ortsangabe (f) {
+  const seite = f.fassade.x + (f.fassade.gedreht ? BANDHOEHE : f.breite) / 2 < 7680 / 2 ? 'links' : 'rechts';
+
+  if (f.gruppe === 'stirn') {
+    if (f.nr === 1) return { kurz: 'über dem Mitteleingang', seite: 'mitte' };
+    if (f.name.includes('Flügel')) return { kurz: (seite === 'links' ? 'linker' : 'rechter') + ' Flügel, oben', seite };
+    return { kurz: 'über dem ' + (seite === 'links' ? 'linken' : 'rechten') + ' Portal', seite };
+  }
+  if (f.gruppe === 'portal') {
+    const welche = f.name.includes('Säule 01') ? 'vordere' : 'hintere';
+    return { kurz: (seite === 'links' ? 'linkes' : 'rechtes') + ' Portal, ' + welche + ' Säule', seite };
+  }
+  // Kolonnaden: die Nummer steht am Ende des Namens.
+  const n = Number((/(\d+)$/.exec(f.name) || [])[1] || 0);
+  const wo = f.gruppe === 'links' ? 'linke Kolonnade'
+    : f.gruppe === 'rechts' ? 'rechte Kolonnade'
+      : 'mittlere Kolonnade';
+  return { kurz: wo + ', ' + n + '. Säule', seite: f.gruppe === 'mitte' ? 'mitte' : f.gruppe };
+}
+
+module.exports = { FLAECHEN, BANDHOEHE, ortsangabe };

@@ -20,7 +20,7 @@ const fastify = require('fastify')({
   }
 });
 const cfg = require('./config');
-const { FLAECHEN } = require('./flaechen');
+const { FLAECHEN, BANDHOEHE, ortsangabe } = require('./flaechen');
 const { abfragen } = require('./db');
 const { groesseFuer, passendeFlaechen } = require('./text');
 const filter = require('./filter');
@@ -31,6 +31,7 @@ const moderation = require('./moderation');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
+const belegungsplan = require('./belegungsplan');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
 
@@ -141,19 +142,39 @@ fastify.get('/api/status/:token', async (req, reply) => {
   const laufend = anzeigen.find(a => a.start <= jetzt && a.ende > jetzt);
   const naechste = abfragen.wartendeVor.get(b.erstellt_am).n;
 
+  // Die Buchung aus dem Belegungsplan: DAS ist die Auskunft, auf die es
+  // ankommt. "Läuft jetzt" nützt niemandem, der am anderen Ende des Gebäudes
+  // steht — gebraucht wird die Ansage vorher, und zwar mit Ort.
+  const eintrag = belegungsplan.naechsterFuer(scheduler.derPlan(), b.id, jetzt);
+  const gebucht = eintrag ? {
+    ...flaecheInfo(eintrag.flaeche),
+    start: eintrag.start,
+    inSekunden: Math.max(0, Math.round((eintrag.start - jetzt) / 1000))
+  } : null;
+
   return {
     status: b.status,
     text: b.text,
     name: b.name,
     anzahlAnzeigen: b.anzahl_anzeigen,
     vorDir: b.anzahl_anzeigen > 0 ? 0 : naechste,
-    // grobe Schätzung: 33 Flächen wechseln alle im Schnitt einmal je Standzeit
+    // Schätzung für alles, was noch nicht gebucht ist. Sie rechnet mit den
+    // Flächen, auf die dieser Text lesbar passt — eine lange Botschaft kommt
+    // seltener dran, und das soll die Auskunft nicht verschweigen.
     geschaetzteWartezeitSekunden: b.anzahl_anzeigen > 0 ? 0
-      : Math.round((naechste / FLAECHEN.length) * einstellungen.standzeit()),
+      : Math.round((naechste / Math.max(1, passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length))
+        * einstellungen.standzeit()),
     jetztAuf: laufend ? flaecheInfo(laufend.flaeche) : null,
-    zuletzt: anzeigen[0] ? { ...flaecheInfo(anzeigen[0].flaeche), start: anzeigen[0].start } : null
+    gebucht,
+    zuletzt: anzeigen[0] ? { ...flaecheInfo(anzeigen[0].flaeche), start: anzeigen[0].start } : null,
+    // Damit die Seite sagen kann "kommt in der nächsten Runde ab 19:43",
+    // statt einen Countdown zu zeigen, der ins Leere läuft.
+    session: sessionKurz(),
+    plan: { bandhoehe: BANDHOEHE, canvas: { breite: 7680, hoehe: 1200 } }
   };
 });
+
+function vollerText (b) { return b.name ? `${b.text} — ${b.name}` : b.text; }
 
 // ---------------------------------------------------------------- Anzeige und Flächen
 
@@ -372,7 +393,15 @@ function sessionKurz () {
 
 function flaecheInfo (nr) {
   const f = FLAECHEN.find(x => x.nr === nr);
-  return f ? { nr: f.nr, name: f.name, gruppe: f.gruppe } : { nr };
+  if (!f) return { nr };
+  const o = ortsangabe(f);
+  return {
+    nr: f.nr, name: f.name, gruppe: f.gruppe, breite: f.breite,
+    // Für den Fassadenplan auf der Statusseite: dieselbe Lage wie im
+    // Simulator, also direkt auf der Resolume-Canvas.
+    fassade: f.fassade,
+    ort: o.kurz, seite: o.seite
+  };
 }
 function hash (s) { return crypto.createHash('sha256').update(s).digest('hex').slice(0, 32); }
 

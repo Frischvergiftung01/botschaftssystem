@@ -31,6 +31,29 @@
   .fuss{color:#6b748b;font-size:.8rem;text-align:center;max-width:520px;line-height:1.5;margin:0}
   .balken{height:6px;background:#232a36;border-radius:99px;overflow:hidden;margin-top:12px}
   .balken div{height:100%;background:var(--gold);width:0;transition:width .6s}
+
+  /* Der Fassadenplan. Der Umriss liegt auf der Resolume-Canvas (7680 x 1200),
+     also im selben Koordinatensystem wie die Flächen — die Marke sitzt damit
+     ohne Umrechnerei an der richtigen Stelle. `screen` blendet Schwarz weg;
+     fehlt die Datei, bleibt es beim dunklen Grund und der Punkt steht immer
+     noch richtig. */
+  .plankarte{padding:14px}
+  .fassade{position:relative;width:100%;aspect-ratio:64/10;background:#05070a;
+    border-radius:10px;overflow:hidden}
+  .fassade::before{content:"";position:absolute;inset:0;
+    background:url('/fassade-umriss.png') center/100% 100% no-repeat;
+    mix-blend-mode:screen;opacity:.5}
+  /* Eine Säulenfläche ist 44 von 7680 breit — als Rechteck auf einem Handy
+     wäre sie zwei Pixel schmal. Deshalb ein Punkt fester Größe auf ihrer
+     Mitte: sichtbar, und die Stelle stimmt trotzdem. */
+  .marke{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;
+    background:var(--gold);box-shadow:0 0 0 3px rgba(255,207,107,.25),0 0 20px 5px rgba(255,207,107,.5);
+    animation:puls 1.8s ease-in-out infinite}
+  .fassade.jetzt .marke{background:var(--gruen);
+    box-shadow:0 0 0 3px rgba(126,224,168,.25),0 0 20px 5px rgba(126,224,168,.55)}
+  .planfuss{display:flex;justify-content:space-between;gap:10px;margin:10px 2px 0;
+    color:var(--leise);font-size:.82rem}
+  .planfuss b{color:var(--text);font-weight:600}
 </style>
 </head>
 <body>
@@ -44,6 +67,14 @@
   <p class="gross" id="kernaussage">Einen Moment …</p>
   <p class="leise" id="erklaerung"></p>
   <div class="balken"><div id="balken"></div></div>
+</div>
+
+<div class="karte plankarte" id="plankarte" hidden>
+  <div class="fassade" id="fassade"><div class="marke" id="marke"></div></div>
+  <div class="planfuss">
+    <span id="planOrt"></span>
+    <span id="planSeite"></span>
+  </div>
 </div>
 
 <a class="knopf" id="weiter" href="/">Noch eine Botschaft schicken</a>
@@ -101,6 +132,28 @@ async function laden () {
   }
 }
 
+const CANVAS_B = 7680, CANVAS_H = 1200, BANDHOEHE = 44;
+const SEITE = { links: 'linke Gebäudehälfte', rechts: 'rechte Gebäudehälfte', mitte: 'Gebäudemitte' };
+
+/** Setzt die Marke auf die Fläche — oder blendet den Plan aus. */
+function planZeigen (f, laeuftGerade) {
+  const karte = el('plankarte');
+  if (!f || !f.fassade) { karte.hidden = true; return; }
+  karte.hidden = false;
+  const breit = f.fassade.gedreht ? BANDHOEHE : f.breite;
+  const hoch = f.fassade.gedreht ? f.breite : BANDHOEHE;
+  el('marke').style.left = ((f.fassade.x + breit / 2) / CANVAS_B * 100) + '%';
+  el('marke').style.top = ((f.fassade.y + hoch / 2) / CANVAS_H * 100) + '%';
+  el('fassade').classList.toggle('jetzt', Boolean(laeuftGerade));
+  el('planOrt').innerHTML = '<b>' + f.ort + '</b>';
+  el('planSeite').textContent = SEITE[f.seite] || '';
+}
+
+function dauer (sekunden) {
+  const v = Math.max(0, Math.round(sekunden));
+  return Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0');
+}
+
 function zeichnen (d) {
   el('botschaft').textContent = d.text;
   const liste = eigene();
@@ -116,11 +169,34 @@ function zeichnen (d) {
   if (d.jetztAuf) {
     karte.classList.add('jetzt');
     el('ueberschrift').innerHTML = '<span class="punkt"></span>Gerade auf der Fassade';
-    el('kernaussage').textContent = d.jetztAuf.name;
-    el('erklaerung').textContent = 'Schau hin! Sie steht rund 25 Sekunden.';
+    el('kernaussage').textContent = d.jetztAuf.ort || d.jetztAuf.name;
+    el('erklaerung').textContent = 'Schau hin! Sie steht noch ein paar Sekunden.';
     el('balken').style.width = '100%';
+    planZeigen(d.jetztAuf, true);
     return planen(3000);           // dicht dran: schnell nachfragen
   }
+
+  // Gebucht: die eigentliche Ansage. Ort und Zeit, bevor es losgeht — wer am
+  // falschen Ende des Gebäudes steht, hat von "läuft jetzt" nichts.
+  if (d.gebucht) {
+    planZeigen(d.gebucht, false);
+    el('balken').style.width = Math.max(6, 100 - Math.min(100, d.gebucht.inSekunden / 1.8)) + '%';
+    if (d.gebucht.inSekunden <= 25) {
+      karte.classList.add('jetzt');
+      el('ueberschrift').innerHTML = '<span class="punkt"></span>Gleich!';
+      el('kernaussage').textContent = d.gebucht.ort;
+      el('erklaerung').textContent = 'Jeden Moment — schau schon mal hin.';
+      return planen(2000);
+    }
+    el('ueberschrift').textContent = 'In ' + dauer(d.gebucht.inSekunden);
+    el('kernaussage').textContent = d.gebucht.ort;
+    el('erklaerung').textContent = d.gebucht.inSekunden <= 180
+      ? 'Genug Zeit, um hinzugehen. Die Seite meldet sich, wenn es so weit ist.'
+      : 'Der Platz steht fest. Die Seite zählt für dich herunter.';
+    return planen(d.gebucht.inSekunden <= 60 ? 3000 : 10000);
+  }
+
+  planZeigen(null);
 
   if (d.status === 'abgelehnt') {
     el('ueberschrift').textContent = 'Nicht freigegeben';
@@ -132,21 +208,33 @@ function zeichnen (d) {
 
   if (d.anzahlAnzeigen > 0) {
     el('ueberschrift').textContent = 'War schon zu sehen';
-    el('kernaussage').textContent = d.zuletzt ? d.zuletzt.name : 'auf der Fassade';
+    el('kernaussage').textContent = d.zuletzt ? (d.zuletzt.ort || d.zuletzt.name) : 'auf der Fassade';
     el('erklaerung').textContent = `Bisher ${d.anzahlAnzeigen}× gezeigt — sie kommt im Lauf des Abends wieder.`;
     el('balken').style.width = '100%';
     return planen(20000);
   }
 
   if (d.status === 'freigegeben') {
+    const s = d.session || {};
+    // Zwischen zwei Runden ist ein Countdown eine Lüge: es passiert nichts,
+    // bis die nächste startet. Dann lieber die Uhrzeit nennen.
+    if (s.phase && s.phase !== 'laeuft' && s.phase !== 'ohnePlan') {
+      el('ueberschrift').textContent = 'Freigegeben';
+      el('kernaussage').textContent = 'Kommt in der nächsten Runde';
+      el('erklaerung').textContent = s.kommend
+        ? `Die nächste beginnt gegen ${s.kommend.geplantStart}. Deine Botschaft ist dann früh dabei.`
+        : 'Sobald es weitergeht, ist deine Botschaft dabei.';
+      el('balken').style.width = '50%';
+      return planen(15000);
+    }
     const min = Math.max(1, Math.round(d.geschaetzteWartezeitSekunden / 60));
     el('ueberschrift').textContent = 'Freigegeben';
     el('kernaussage').textContent = d.vorDir === 0 ? 'Gleich geht es los' : `${d.vorDir} Botschaften vor dir`;
     el('erklaerung').textContent = d.vorDir === 0
       ? 'Deine Botschaft ist als Nächstes an der Reihe.'
-      : `Das dauert schätzungsweise ${min} Minute${min === 1 ? '' : 'n'}. Die Seite kannst du offen lassen.`;
+      : `Das dauert schätzungsweise ${min} Minute${min === 1 ? '' : 'n'}. Sobald der Platz feststeht, sagen wir dir, wo du hinschauen musst.`;
     el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
-    return planen(d.geschaetzteWartezeitSekunden < 90 ? 3000 : 20000);
+    return planen(d.geschaetzteWartezeitSekunden < 90 ? 3000 : 15000);
   }
 
   el('ueberschrift').textContent = 'Wird geprüft';

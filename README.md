@@ -14,7 +14,7 @@ wann und wo.
 | Seite | Adresse | wofür |
 |---|---|---|
 | Eingabe | `/` | Besucher tippen ihre Botschaft, mit Live-Vorschau in Projektionsoptik |
-| Status | `/status?t=…` | „noch 12 vor dir" bzw. „jetzt auf Säule Mitte 03" |
+| Status | `/status?t=…` | „in 2:10 — mittlere Kolonnade, 4. Säule", mit Fassadenplan |
 | Simulator | `/simulator` | die Fassade im Browser, solange kein Projektor läuft |
 | Moderation | `/moderation` | Freigeben, Ablehnen, Zurückstellen — mit Kennwort |
 | Hinweise | `/moderation` → Reiter | organisatorische Durchsagen auf der Stirnseite Mitte |
@@ -157,6 +157,32 @@ ungültig. Ohne Kennwort bleibt die Oberfläche zu — auch unter `/moderation.h
 **Durchsatzprobe:** `npm run queue-fuellen -- 300`, dann `/moderation` öffnen und die Stoppuhr
 laufen lassen. Der Kopf zeigt „letzte 5 min" und die Hochrechnung auf die Stunde.
 
+## Belegungsplan und die Auskunft an den Absender
+
+Der Scheduler entschied früher erst im Moment des Wechsels, welche Botschaft eine frei gewordene
+Fläche bekommt. Für die Fassade genügt das, für die Auskunft nicht: „läuft jetzt" nützt niemandem,
+der am anderen Ende des Gebäudes steht. Deshalb wird **gebucht** — derselbe Algorithmus, nur ein
+paar Minuten vorher gerechnet (`PLAN_HORIZONT`, Vorgabe 180 s).
+
+Der Plan wird **nicht periodisch neu gerechnet, sondern hinten verlängert.** Das ist der Kern:
+würde alle paar Minuten alles neu verteilt, stünde die Botschaft, für die eben noch „mittlere
+Kolonnade, 4. Säule" angesagt war, plötzlich woanders. Moderationseingriffe streichen nur die
+betroffenen Buchungen; alle übrigen Zusagen bleiben stehen.
+
+Er ist eine **Vorschaltung, keine Ablösung.** Findet sich für eine Fläche keine gültige Buchung,
+entscheidet der Scheduler wie vorher. Ein Fehler degradiert damit zur alten Funktion und nicht zu
+einer dunklen Wand. Abschalten geht über den Schalter `belegungsplan`, ohne Redeploy.
+
+Die Statusseite zeigt daraus einen **Fassadenplan** mit leuchtender Marke an der richtigen Stelle
+und den Ort in Menschensprache — „linke Kolonnade, 3. Säule", nicht „Säule Links 03". Der Umriss
+im Hintergrund ist `public/fassade-umriss.png`, eine Zeichnung auf der Resolume-Canvas
+(7680 × 1200); dadurch sitzt die Marke ohne jede Umrechnung richtig. Fehlt die Datei, bleibt der
+Grund dunkel und die Marke stimmt trotzdem.
+
+Ein Nebeneffekt, den man kennen sollte: eine frisch freigegebene Botschaft wird ans Ende des Plans
+gebucht und kommt damit bis zu einen Horizont später an die Wand als früher. Dafür weiß der
+Absender sofort, wo und wann — statt „gleich, irgendwo".
+
 ## Hinweise vom Platz
 
 Organisatorische Durchsagen — „Letzte Runde um 22:30", „Bitte den Durchgang freihalten" — laufen auf
@@ -212,9 +238,6 @@ niemand auf einen Redeploy warten.
 
 - **Block 6:** Bridge auf dem Medien-PC — der Simulator wird gegen Arena getauscht, beide bleiben
   umschaltbar
-- **Belegungsplan:** der Scheduler bucht ein paar Minuten im Voraus, damit die Statusseite nicht
-  nur sagen kann *wann*, sondern auch *wo* — wer am falschen Ende des Gebäudes steht, hat von
-  „läuft jetzt" nichts
 - **Block 7:** Ausbau — Statusseite mit Fassadenplan, Monitoring, Seed-Pool
 - **Block 8:** Härtung — Lasttest, Red-Team, Vollprobe
 
