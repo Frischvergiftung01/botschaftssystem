@@ -47,6 +47,22 @@ CREATE TABLE IF NOT EXISTS anzeigen (
 CREATE INDEX IF NOT EXISTS idx_anzeigen_botschaft ON anzeigen(botschaft_id, start);
 CREATE INDEX IF NOT EXISTS idx_anzeigen_flaeche   ON anzeigen(flaeche, start);
 
+-- Hinweise vom Platz: organisatorische Durchsagen auf der Stirnseite Mitte.
+-- BEWUSST eine eigene Tabelle und nicht botschaften: sie kommen nicht aus
+-- dem Publikum, gehen durch keinen Filter, brauchen keine Moderation und
+-- duerfen weder in der Queue noch in den Kennzahlen auftauchen. Ein Flag auf
+-- botschaften haette all das an jeder Abfrage nachgezogen.
+CREATE TABLE IF NOT EXISTS hinweise (
+  id              INTEGER PRIMARY KEY,
+  nr              INTEGER NOT NULL UNIQUE,  -- Platz in der Liste, ab 1
+  text            TEXT    NOT NULL DEFAULT '',
+  -- scharf heisst: kommt an die Wand, sobald die Flaeche das naechste Mal
+  -- wechselt. Stehendes wird nie unterbrochen.
+  scharf          INTEGER NOT NULL DEFAULT 0,
+  anzahl_anzeigen INTEGER NOT NULL DEFAULT 0,
+  zuletzt_gezeigt INTEGER
+);
+
 -- Die Spielzeiten des Abends (Sessions). Minuten seit Mitternacht als Plan,
 -- echte Zeitstempel sobald gestartet wurde. Dass beides in der Datenbank
 -- steht und nicht im Arbeitsspeicher, ist Absicht: eine laufende Session
@@ -113,6 +129,16 @@ const abfragen = {
   statusSetzen: db.prepare('UPDATE botschaften SET status = @status, entschieden_am = @zeit WHERE id = @id'),
   alleAnzeigenLoeschen: db.prepare('DELETE FROM anzeigen'),
   alleBotschaftenLoeschen: db.prepare('DELETE FROM botschaften'),
+
+  // ---- Hinweise vom Platz ------------------------------------------------
+  hinweiseListe: db.prepare('SELECT * FROM hinweise ORDER BY nr ASC'),
+  hinweiseLeeren: db.prepare('DELETE FROM hinweise'),
+  hinweisEinfuegen: db.prepare(`INSERT INTO hinweise (nr, text, scharf, anzahl_anzeigen, zuletzt_gezeigt)
+                                VALUES (@nr, @text, @scharf, @anzahl_anzeigen, @zuletzt_gezeigt)`),
+  hinweisScharf: db.prepare('UPDATE hinweise SET scharf = @scharf WHERE nr = @nr'),
+  hinweisGezeigt: db.prepare(`UPDATE hinweise
+                              SET anzahl_anzeigen = anzahl_anzeigen + 1, zuletzt_gezeigt = @zeit
+                              WHERE id = @id`),
 
   // ---- Spielzeiten -------------------------------------------------------
   sessionenListe: db.prepare('SELECT * FROM sessionen ORDER BY nr ASC'),

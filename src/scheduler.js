@@ -28,6 +28,7 @@ const { groesseFuer } = require('./text');
 const { abfragen } = require('./db');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
+const hinweise = require('./hinweise');
 
 // Laufender Zustand je Fläche — das ist genau das, was Simulator und Bridge lesen.
 const zustand = new Map();
@@ -38,6 +39,7 @@ for (const [i, f] of FLAECHEN.entries()) {
     breite: f.breite,
     gruppe: f.gruppe,
     botschaftId: null,
+    hinweisId: null,     // steht statt einer Botschaft ein Hinweis vom Platz hier?
     text: '',
     absender: null,
     start: 0,
@@ -76,8 +78,20 @@ function takt () {
   }
 }
 
-/** Sucht die nächste passende Botschaft für eine Fläche und trägt sie ein. */
+/**
+ * Sucht die nächste passende Botschaft für eine Fläche und trägt sie ein.
+ *
+ * Vorrang hat die Stirnseite Mitte, solange dort Hinweise vom Platz scharf
+ * stehen: dann gehört sie ihnen. Umleiten muss man dafür nichts — der
+ * Scheduler teilt nicht im Voraus zu, sondern sucht beim Belegen aus dem
+ * Vorrat, also verteilen sich die Publikumsbotschaften von selbst auf die
+ * übrigen 32 Flächen.
+ */
 function belegen (f, t) {
+  if (f.nr === cfg.hinweisFlaeche) {
+    const h = hinweise.naechster(f.hinweisId);
+    if (h) return hinweisSetzen(f, h, t);
+  }
   const kandidaten = abfragen.spielbar.all();
   if (kandidaten.length === 0) return false;
 
@@ -92,6 +106,10 @@ function belegen (f, t) {
 
     const ende = t + einstellungen.standzeit() * 1000;
     f.botschaftId = b.id;
+    // Zuruecksetzen, sonst gilt die Flaeche nach einem Hinweis weiter als
+    // belegt von ihm — und die Anzeige weist eine Publikumsbotschaft als
+    // Durchsage aus.
+    f.hinweisId = null;
     f.text = voll;
     f.absender = b.name || null;
     f.start = t;
@@ -106,6 +124,24 @@ function belegen (f, t) {
     return true;
   }
   return false;
+}
+
+/**
+ * Trägt einen Hinweis vom Platz auf der Stirnseite Mitte ein. Kein Eintrag in
+ * `anzeigen`: dort hängt ein Fremdschlüssel auf `botschaften`, und ein Hinweis
+ * ist keine. Gezählt wird auf seiner eigenen Zeile.
+ */
+function hinweisSetzen (f, h, t) {
+  const g = groesseFuer(h.text, f.breite, cfg.maxVersalhoehe);
+  f.botschaftId = null;
+  f.hinweisId = h.id;
+  f.text = h.text;
+  f.absender = null;          // ein Hinweis hat keinen
+  f.start = t;
+  f.ende = t + einstellungen.standzeit() * 1000;
+  f.groesse = g;
+  hinweise.gezeigt(h.id, t);
+  return true;
 }
 
 /**
@@ -132,6 +168,7 @@ function alleEntfernen () {
 
 function raeumen (f) {
   f.botschaftId = null;
+  f.hinweisId = null;
   f.text = '';
   f.absender = null;
   f.start = 0;
@@ -160,6 +197,9 @@ function anzeige () {
     gruppe: f.gruppe,
     text: f.ende > t ? f.text : '',
     absender: f.ende > t ? f.absender : null,
+    // Für die Fassade macht es keinen Unterschied — für Simulator, Statusseite
+    // und spätere Auswertung schon: das hier kam nicht aus dem Publikum.
+    hinweis: f.ende > t && f.hinweisId !== null,
     restSekunden: f.ende > t ? Math.round((f.ende - t) / 100) / 10 : 0,
     schrifthoehe: f.groesse ? f.groesse.schrifthoehe : null,
     versalhoehe: f.groesse ? f.groesse.versalhoehe : null,

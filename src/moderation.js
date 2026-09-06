@@ -19,6 +19,7 @@ const { groesseFuer } = require('./text');
 const scheduler = require('./scheduler');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
+const hinweise = require('./hinweise');
 
 /** Was die Oberfläche schicken darf und welcher Status daraus wird. */
 const ZIEL = {
@@ -160,6 +161,9 @@ function kennzahlen () {
     // aus derselben Abfrage lebt wie die Zahlen — eine Anfrage statt zwei.
     session: sessionen.stand(),
     standzeitSekunden: einstellungen.standzeit(),
+    // Wie viele Hinweise gerade die Stirnseite Mitte belegen. Gehoert in den
+    // Kopf: eine gesperrte Flaeche soll man sehen, ohne den Reiter zu oeffnen.
+    hinweiseScharf: hinweise.stand().scharfe,
     standzeitGrenzen: { min: einstellungen.STANDZEIT_MIN, max: einstellungen.STANDZEIT_MAX },
     rasterGroesse: cfg.rasterGroesse,
     darfLeeren: cfg.datenbankLeerenErlaubt

@@ -241,6 +241,50 @@ async function balkenText (seite) {
     pruefe('ohne eingefangenen Hintergrund', /rgba\(0, 0, 0, 0\)|transparent/.test(grund), grund);
   }
 
+  console.log('\nHinweise vom Platz');
+  {
+    await seite.click('nav button[data-ansicht="hinweise"]');
+    pruefe('der Reiter geht auf', await seite.locator('#hinweise').isVisible());
+    // Die Plaetze kommen ueber die Schnittstelle, also erst abwarten.
+    await seite.waitForFunction(() => document.querySelectorAll('.hinweis-karte').length > 0);
+    pruefe('fuenf vorbereitete Plaetze', await seite.locator('.hinweis-karte').count() === 5,
+      await seite.locator('.hinweis-karte').count());
+    pruefe('die Flaeche steht dabei',
+      /Stirn/.test(await seite.locator('#hinweisFlaeche').textContent()),
+      await seite.locator('#hinweisFlaeche').textContent());
+    pruefe('noch keine Vorschau', await seite.locator('.hinweis-karte .buehne:visible').count() === 0);
+
+    await seite.fill('.hinweis-karte textarea >> nth=0', 'Letzte Runde um 22:30');
+    pruefe('Hinweis auf Ungespeichertes',
+      /nicht gespeichert/.test(await seite.locator('#hinweisStand').textContent()),
+      await seite.locator('#hinweisStand').textContent());
+    // Die Vorschau rechnet ueber den Server, also kurz warten.
+    await seite.waitForFunction(() =>
+      document.querySelector('.hinweis-karte .buehne span').textContent.includes('22:30'));
+    pruefe('die Vorschau zeigt den Text in Projektionsoptik',
+      await seite.locator('.hinweis-karte .buehne').first().isVisible());
+
+    // Scharfstellen sichert den Text von selbst mit.
+    await seite.click('.hinweis-karte .pille >> nth=0');
+    await seite.waitForFunction(() =>
+      document.querySelectorAll('.hinweis-karte.an').length === 1);
+    pruefe('der Platz ist als scharf markiert', await seite.locator('.hinweis-karte.an').count() === 1);
+    pruefe('der Knopf heisst jetzt Herausnehmen',
+      /Herausnehmen/.test(await seite.locator('.hinweis-karte .pille').first().textContent()));
+    pruefe('nichts blieb ungespeichert',
+      await seite.locator('#hinweisSpeichern.offen').count() === 0);
+    await seite.waitForFunction(() => !document.getElementById('zHinweiseFeld').hidden);
+    pruefe('der Kopf zeigt die belegte Flaeche an',
+      (await seite.locator('#zHinweise').textContent()) === '1',
+      await seite.locator('#zHinweise').textContent());
+
+    await seite.click('.hinweis-karte .pille >> nth=0');
+    await seite.waitForFunction(() => document.querySelectorAll('.hinweis-karte.an').length === 0);
+    pruefe('herausgenommen', await seite.locator('.hinweis-karte.an').count() === 0);
+    await seite.waitForFunction(() => document.getElementById('zHinweiseFeld').hidden);
+    pruefe('und der Kopf ist wieder ruhig', await seite.locator('#zHinweiseFeld').isHidden());
+  }
+
   console.log('\nDie Moderation selbst ist unberuehrt');
   {
     await seite.click('nav button[data-ansicht="uebersicht"]');

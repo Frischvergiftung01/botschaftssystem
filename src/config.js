@@ -60,6 +60,13 @@ module.exports = {
   // Angabe laege der ganze Abend um eine Stunde daneben.
   zeitzone: process.env.ZEITZONE || 'Europe/Berlin',
 
+  // Hinweise vom Platz (organisatorische Durchsagen).
+  // Sie belegen genau eine Flaeche: die Stirnseite Mitte, mit 2280 px die
+  // breiteste und vom Vorplatz aus die am besten lesbare.
+  hinweisFlaeche: Number(process.env.HINWEIS_FLAECHE || 1),
+  hinweisPlaetze: Number(process.env.HINWEIS_PLAETZE || 5),
+  maxZeichenHinweis: Number(process.env.MAX_ZEICHEN_HINWEIS || 120),
+
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),
   blendeSekunden: 0.35,          // muss zum Patch passen (Smooth-Knoten)

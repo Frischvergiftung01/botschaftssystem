@@ -30,6 +30,7 @@ const auth = require('./auth');
 const moderation = require('./moderation');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
+const hinweise = require('./hinweise');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
 
@@ -244,6 +245,34 @@ fastify.post('/api/moderation/schalter', async (req, reply) => {
   const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
   req.log.warn({ name, wert: Boolean(req.body?.wert) }, 'Schalter umgelegt');
   return { schalter: stand };
+});
+
+// ---------------------------------------------------------------- Hinweise vom Platz
+// Organisatorische Durchsagen auf der Stirnseite Mitte. Vorbereitete Plaetze,
+// die am Abend nur noch scharf gestellt werden.
+
+fastify.get('/api/moderation/hinweise', async () => hinweise.stand());
+
+fastify.post('/api/moderation/hinweise', async (req, reply) => {
+  const zeilen = Array.isArray(req.body?.zeilen) ? req.body.zeilen : null;
+  if (!zeilen) return reply.code(400).send({ fehler: 'Es fehlen die Zeilen.' });
+  if (zeilen.length > 20) return reply.code(400).send({ fehler: 'Hoechstens 20 Plaetze.' });
+  try {
+    hinweise.speichern(zeilen);
+    return hinweise.stand();
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
+  }
+});
+
+fastify.post('/api/moderation/hinweis-scharf', async (req, reply) => {
+  try {
+    const stand = hinweise.scharfSetzen(req.body?.nr, Boolean(req.body?.wert));
+    req.log.warn({ nr: req.body?.nr, wert: Boolean(req.body?.wert) }, 'Hinweis geschaltet');
+    return stand;
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
+  }
 });
 
 // ---------------------------------------------------------------- Spielzeiten

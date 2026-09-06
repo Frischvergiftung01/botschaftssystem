@@ -17,6 +17,7 @@ wann und wo.
 | Status | `/status?t=…` | „noch 12 vor dir" bzw. „jetzt auf Säule Mitte 03" |
 | Simulator | `/simulator` | die Fassade im Browser, solange kein Projektor läuft |
 | Moderation | `/moderation` | Freigeben, Ablehnen, Zurückstellen — mit Kennwort |
+| Hinweise | `/moderation` → Reiter | organisatorische Durchsagen auf der Stirnseite Mitte |
 
 Wann gespielt wird, steht in den **Spielzeiten** (weiter unten): der Nachschub läuft nur innerhalb
 einer gestarteten Runde. Ohne eingetragene Zeiten läuft die Fassade durch.
@@ -155,6 +156,31 @@ ungültig. Ohne Kennwort bleibt die Oberfläche zu — auch unter `/moderation.h
 
 **Durchsatzprobe:** `npm run queue-fuellen -- 300`, dann `/moderation` öffnen und die Stoppuhr
 laufen lassen. Der Kopf zeigt „letzte 5 min" und die Hochrechnung auf die Stunde.
+
+## Hinweise vom Platz
+
+Organisatorische Durchsagen — „Letzte Runde um 22:30", „Bitte den Durchgang freihalten" — laufen auf
+der **Stirnseite Mitte** (Fläche 1, mit 2280 px die breiteste und vom Vorplatz aus die am besten
+lesbare). Unter `/moderation` im Reiter **Hinweise** stehen dafür fünf vorbereitete Plätze; am Abend
+wird nur noch **scharf gestellt**.
+
+- Scharfstellen wirkt beim **nächsten Wechsel** der Fläche. Die laufende Botschaft wird nicht
+  unterbrochen — wie überall im System läuft aus, was steht.
+- Stehen mehrere scharf, kommen sie **reihum**.
+- Solange dort ein Hinweis steht, gehört ihm die Fläche. **Umgeleitet werden muss dafür nichts:**
+  der Scheduler teilt nicht im Voraus zu, sondern sucht beim Belegen aus dem Vorrat — die
+  Publikumsbotschaften verteilen sich von selbst auf die übrigen 32 Flächen. Nur sehr lange Texte
+  warten dann länger, weil sie ausschließlich auf die Stirnseite gepasst hätten.
+- Nach dem Herausnehmen läuft der Hinweis seine Standzeit zu Ende, dann ist die Fläche wieder frei.
+- Hinweise laufen nur innerhalb einer gestarteten **Session** — außerhalb ist die Wand leer.
+
+Die Texte stehen in einer **eigenen Tabelle**, nicht bei den Botschaften: sie kommen nicht aus dem
+Publikum, gehen durch keinen Filter, brauchen keine Moderation und dürfen weder in der Queue noch in
+den Kennzahlen des Abends auftauchen. Im Kopf der Moderation steht nur mit, wie viele gerade scharf
+sind — eine belegte Stirnseite soll man sehen, ohne den Reiter zu öffnen.
+
+Die Eingabe zeigt eine **Vorschau in Projektionsoptik** und warnt, wenn ein Text so lang wird, dass
+er selbst auf der breitesten Fläche kaum noch zu lesen ist.
 
 ## Spielzeiten
 

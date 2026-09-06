@@ -68,6 +68,22 @@
   #planSpeichern.offen{box-shadow:0 0 0 3px rgba(255,207,107,.4)}
   .planzeile input.offen{border-color:var(--gold)}
 
+  /* Hinweise vom Platz. Ein scharfer Platz belegt die Stirnseite Mitte —
+     das muss man auf einen Blick sehen, auch von der anderen Seite des Raums. */
+  .hinweis-karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;
+    padding:12px;margin-bottom:12px}
+  .hinweis-karte.an{border-color:var(--gut);box-shadow:0 0 0 2px rgba(95,208,138,.22)}
+  .hinweis-karte .kopfzeile{margin-bottom:8px}
+  .hinweis-karte .kopfzeile .an{color:var(--gut);font-weight:650}
+  .hinweis-karte textarea{width:100%;background:var(--grund);color:var(--text);
+    border:1px solid var(--rand);border-radius:10px;padding:10px 12px;font:inherit;
+    resize:vertical;min-height:2.6rem}
+  .hinweis-karte textarea.offen{border-color:var(--gold)}
+  .hinweis-karte .buehne{margin-top:10px}
+  .hinweis-zeile{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .hinweis-zeile .warnung{color:var(--unsicher);font-size:.8rem}
+  .zahlen .hinweise b{color:var(--gut)}
+
   .seiten{display:flex;gap:14px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--rand);
     font-size:.82rem;color:var(--leise)}
   .seiten a{color:var(--gold);text-decoration:none}
@@ -159,6 +175,7 @@
     <span>offen <b id="zOffen">–</b></span>
     <span>letzte 5 min <b id="z5">–</b></span>
     <span>Durchsatz <b id="zDurchsatz">–</b>/h</span>
+    <span class="hinweise" id="zHinweiseFeld" hidden>Hinweise <b id="zHinweise">–</b></span>
   </div>
   <div class="rechts">
     <button class="pille" id="sAuto">Auto-Freigabe</button>
@@ -182,6 +199,7 @@
   <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
   <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
   <button data-ansicht="spielzeiten">Spielzeiten</button>
+  <button data-ansicht="hinweise">Hinweise</button>
   <button data-ansicht="werkzeuge">Werkzeuge</button>
 </nav>
 
@@ -249,6 +267,28 @@
     </div>
   </section>
 
+  <section id="hinweise" hidden>
+    <div class="karte">
+      <h2>Hinweise vom Platz</h2>
+      <p class="fuss">Organisatorische Durchsagen auf der <b id="hinweisFlaeche">Stirnseite Mitte</b> —
+      der breitesten Fläche und vom Vorplatz aus der am besten lesbaren.<br>
+      Texte kannst du vorbereiten und am Abend nur noch <b>scharf stellen</b>. Ein scharfer Hinweis
+      erscheint beim <b>nächsten Wechsel</b> der Fläche; die laufende Botschaft wird nicht
+      unterbrochen. Stehen mehrere scharf, kommen sie reihum.<br>
+      Solange dort ein Hinweis steht, gehört die Fläche ihm — die Publikumsbotschaften verteilen
+      sich von selbst auf die übrigen 32. Nach dem Herausnehmen läuft der Hinweis seine Standzeit
+      zu Ende, dann ist die Fläche wieder frei.<br>
+      Hinweise laufen nur, solange auch eine <b>Session</b> läuft.</p>
+    </div>
+    <div id="hinweisListe" style="margin-top:14px"></div>
+    <div class="werkzeug">
+      <button class="pille" id="hinweisDazu">Platz hinzufügen</button>
+      <button class="pille" id="hinweisSpeichern"
+        style="background:var(--gut);color:#04240f;border:0;font-weight:650">Texte speichern</button>
+      <span class="fuss" id="hinweisStand"></span>
+    </div>
+  </section>
+
   <section id="werkzeuge" hidden>
     <div class="karte">
       <h2>Not-Aus</h2>
@@ -309,6 +349,10 @@ let sessionStand = null;    // Spielzeiten, kommt mit den Kennzahlen mit
 let zeitVersatz = 0;        // Serveruhr minus eigene Uhr
 let planZeilen = [];        // lokaler Bearbeitungsstand der Zeilentabelle
 let planGeaendert = false;  // getippt, aber noch nicht gespeichert
+let hinweisStand = null;    // Hinweise vom Platz, Stirnseite Mitte
+let hinweisZeilen = [];
+let hinweisGeaendert = false;
+let hinweisMinVersal = 22;  // darunter gilt ein Text als nicht lesbar
 
 start();
 
@@ -350,6 +394,11 @@ async function start () {
   el('planSpeichern').addEventListener('click', planSpeichern);
   el('genKnopf').addEventListener('click', zeitenErzeugen);
   el('standzeitKnopf').addEventListener('click', standzeitUebernehmen);
+  el('hinweisDazu').addEventListener('click', () => {
+    hinweisZeilen.push({ nr: hinweisZeilen.length + 1, text: '', scharf: false, anzahlAnzeigen: 0, optik: null });
+    hinweiseZeichnen(); hinweisOffen();
+  });
+  el('hinweisSpeichern').addEventListener('click', () => hinweiseSpeichern(true));
   // Der Balken zaehlt selbst herunter, statt sekuendlich zu fragen.
   setInterval(spielbalkenZeichnen, 1000);
   document.addEventListener('keydown', taste);
@@ -368,7 +417,7 @@ async function start () {
 // ---------------------------------------------------------------- Daten
 
 async function laden (frisch) {
-  if (ansicht === 'werkzeuge' || ansicht === 'spielzeiten') { zeichnen(); return; }
+  if (['werkzeuge', 'spielzeiten', 'hinweise'].includes(ansicht)) { zeichnen(); return; }
   if (ansicht === 'uebersicht') {
     const [r1, r2] = await Promise.all([
       fetch('/api/moderation/queue?ansicht=einzeln&grenze=60'),
@@ -431,6 +480,11 @@ function zahlenZeichnen () {
   el('leerenKnopf').disabled = !stand.darfLeeren;
   if (stand.session) sessionSetzen(stand.session);
   standzeitZeichnen();
+  // Eine belegte Stirnseite Mitte gehoert in den Kopf: sonst wundert man sich,
+  // warum die breiteste Flaeche keine Botschaften mehr zeigt.
+  const scharfe = stand.hinweiseScharf || 0;
+  el('zHinweiseFeld').hidden = scharfe === 0;
+  el('zHinweise').textContent = scharfe;
 }
 
 // ---------------------------------------------------------------- Zeichnen
@@ -440,6 +494,8 @@ function wechseln (neu) {
   // lieber einmal nachfragen als am Abend eine Runde ohne Zeiten haben.
   if (ansicht === 'spielzeiten' && neu !== 'spielzeiten' && planGeaendert
       && !confirm('Die geänderten Spielzeiten sind noch nicht gespeichert.\n\nTrotzdem wechseln?')) return;
+  if (ansicht === 'hinweise' && neu !== 'hinweise' && hinweisGeaendert
+      && !confirm('Die geänderten Hinweistexte sind noch nicht gespeichert.\n\nTrotzdem wechseln?')) return;
   if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
   ansicht = neu;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
@@ -449,8 +505,10 @@ function wechseln (neu) {
   el('liste').hidden = !['zurueckgestellt', 'pool', 'abgelehnt'].includes(neu);
   el('werkzeuge').hidden = neu !== 'werkzeuge';
   el('spielzeiten').hidden = neu !== 'spielzeiten';
+  el('hinweise').hidden = neu !== 'hinweise';
   document.querySelector('main').classList.toggle('uebersicht', haupt);
   if (neu === 'spielzeiten') planHolen();
+  if (neu === 'hinweise') hinweiseHolen();
   laden(true);
 }
 
@@ -458,7 +516,7 @@ function zeichnen () {
   if (ansicht === 'uebersicht') { zeichnenEinzeln(); zeichnenRaster(); }
   else if (ansicht === 'einzeln') zeichnenEinzeln();
   else if (ansicht === 'raster') zeichnenRaster();
-  else if (ansicht !== 'werkzeuge' && ansicht !== 'spielzeiten') zeichnenListe();
+  else if (!['werkzeuge', 'spielzeiten', 'hinweise'].includes(ansicht)) zeichnenListe();
 }
 
 function buehneBauen () {
@@ -963,6 +1021,179 @@ function zeitenErzeugen () {
   planZeichnen();
   planOffen(erzeugt.length + ' Zeilen erzeugt — noch nicht gespeichert.'
     + (abgeschnitten ? ' Die späteren lägen nach Mitternacht und wurden weggelassen.' : ''));
+}
+
+// ---------------------------------------------------------------- Hinweise vom Platz
+//
+// Vorbereitete Texte fuer die Stirnseite Mitte, die am Abend nur noch scharf
+// gestellt werden. Die Vorschau rechnet in Projektionsoptik, damit man vor dem
+// Scharfstellen sieht, wie klein ein langer Text auf der Fassade wird.
+
+async function hinweiseHolen () {
+  const antwort = await fetch('/api/moderation/hinweise');
+  if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+  hinweisUebernehmen(await antwort.json());
+  hinweisZu('');
+}
+
+function hinweisUebernehmen (d) {
+  hinweisStand = d;
+  if (typeof d.minVersalhoehe === 'number') hinweisMinVersal = d.minVersalhoehe;
+  hinweisZeilen = d.zeilen.map(z => ({ ...z }));
+  el('hinweisFlaeche').textContent = d.flaeche.name;
+  hinweiseZeichnen();
+}
+
+function hinweisOffen (text) {
+  hinweisGeaendert = true;
+  el('hinweisSpeichern').classList.add('offen');
+  el('hinweisStand').className = 'fuss ungespeichert';
+  el('hinweisStand').textContent = text || 'Geändert — noch nicht gespeichert.';
+}
+
+function hinweisZu (text) {
+  hinweisGeaendert = false;
+  el('hinweisSpeichern').classList.remove('offen');
+  el('hinweisStand').className = 'fuss';
+  el('hinweisStand').textContent = text || '';
+}
+
+function hinweiseZeichnen () {
+  const ziel = el('hinweisListe');
+  ziel.innerHTML = '';
+  hinweisZeilen.forEach((z, i) => {
+    const karte = document.createElement('div');
+    karte.className = 'hinweis-karte' + (z.scharf ? ' an' : '');
+
+    const kopf = document.createElement('div');
+    kopf.className = 'kopfzeile';
+    const platz = document.createElement('span');
+    platz.textContent = 'Platz ' + (i + 1);
+    kopf.appendChild(platz);
+    if (z.scharf) {
+      const an = document.createElement('span');
+      an.className = 'an';
+      an.textContent = 'scharf';
+      kopf.appendChild(an);
+    }
+    if (z.anzahlAnzeigen) {
+      const oft = document.createElement('span');
+      oft.textContent = z.anzahlAnzeigen + '× gezeigt';
+      kopf.appendChild(oft);
+    }
+
+    const feld = document.createElement('textarea');
+    feld.value = z.text;
+    feld.rows = 2;
+    feld.maxLength = (hinweisStand && hinweisStand.maxZeichen) || 120;
+    feld.placeholder = 'z. B. Letzte Runde um 22:30';
+    feld.setAttribute('aria-label', 'Text für Platz ' + (i + 1));
+    feld.addEventListener('input', () => {
+      hinweisZeilen[i].text = feld.value;
+      feld.classList.add('offen');
+      hinweisOffen();
+      vorschauNachziehen(i, buehne, warnung, feld.value);
+    });
+
+    const buehne = buehneBauen();
+    const warnung = document.createElement('span');
+    warnung.className = 'warnung';
+
+    const zeile = document.createElement('div');
+    zeile.className = 'hinweis-zeile';
+    const schalter = document.createElement('button');
+    schalter.className = z.scharf ? 'pille aus' : 'pille an';
+    schalter.textContent = z.scharf ? 'Herausnehmen' : 'Scharf stellen';
+    schalter.addEventListener('click', () => hinweisSchalten(i, !z.scharf));
+    const weg = document.createElement('button');
+    weg.className = 'weck';
+    weg.textContent = 'Platz entfernen';
+    weg.addEventListener('click', () => {
+      if (z.scharf && !confirm('Dieser Platz steht scharf. Wirklich entfernen?')) return;
+      hinweisZeilen.splice(i, 1); hinweiseZeichnen(); hinweisOffen();
+    });
+    zeile.appendChild(schalter);
+    zeile.appendChild(weg);
+    zeile.appendChild(warnung);
+
+    karte.appendChild(kopf);
+    karte.appendChild(feld);
+    karte.appendChild(buehne);
+    karte.appendChild(zeile);
+    ziel.appendChild(karte);
+
+    vorschauZeichnen(buehne, warnung, z.text, z.optik);
+  });
+
+  if (!hinweisZeilen.length) {
+    const p = document.createElement('p');
+    p.className = 'fuss';
+    p.textContent = 'Kein Platz angelegt.';
+    ziel.appendChild(p);
+  }
+}
+
+function vorschauZeichnen (buehne, warnung, text, optik) {
+  const leer = !text.trim();
+  buehne.hidden = leer;
+  warnung.textContent = '';
+  if (leer || !optik) return;
+  buehneMalen(buehne, { voll: text, optik });
+  if (optik.versalhoehe < hinweisMinVersal) {
+    warnung.textContent = 'Zu lang — auf der Fassade nur ' + optik.versalhoehe
+      + ' px hoch und damit kaum zu lesen.';
+  }
+}
+
+// Waehrend des Tippens rechnet der Server die Optik — dieselbe Rechnung wie an
+// der Fassade, nur eben live. Gedrosselt, damit nicht jeder Anschlag fragt.
+let vorschauUhr = null;
+function vorschauNachziehen (i, buehne, warnung, text) {
+  clearTimeout(vorschauUhr);
+  vorschauUhr = setTimeout(async () => {
+    if (!text.trim()) { vorschauZeichnen(buehne, warnung, text, null); return; }
+    try {
+      const antwort = await fetch('/api/probe?text=' + encodeURIComponent(text));
+      if (!antwort.ok) return;
+      const d = await antwort.json();
+      const f = d.flaechen.find(x => x.nr === (hinweisStand && hinweisStand.flaeche.nr));
+      if (!f) return;
+      hinweisZeilen[i].optik = f;
+      vorschauZeichnen(buehne, warnung, text, f);
+    } catch (e) { /* Netz weg, Vorschau bleibt stehen */ }
+  }, 300);
+}
+
+async function hinweiseSpeichern (melde) {
+  const antwort = await fetch('/api/moderation/hinweise', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ zeilen: hinweisZeilen.map(z => ({ text: z.text, scharf: z.scharf })) })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { el('hinweisStand').textContent = d.fehler || 'Nicht gespeichert.'; return false; }
+  hinweisUebernehmen(d);
+  hinweisZu(d.zeilen.length + ' Plätze gespeichert.');
+  if (melde) melden('Hinweistexte gespeichert.');
+  zahlenHolen();
+  return true;
+}
+
+async function hinweisSchalten (i, wert) {
+  // Erst sichern: sonst stellt man einen Text scharf, den der Server so noch
+  // gar nicht kennt, und auf der Fassade steht die vorige Fassung.
+  if (hinweisGeaendert && !(await hinweiseSpeichern(false))) return;
+  const nr = i + 1;
+  const antwort = await fetch('/api/moderation/hinweis-scharf', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nr, wert })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { el('hinweisStand').textContent = d.fehler || 'Nicht möglich.'; return; }
+  hinweisUebernehmen(d);
+  zahlenHolen();
+  melden(wert
+    ? 'Platz ' + nr + ' scharf — kommt beim nächsten Wechsel auf ' + d.flaeche.name + '.'
+    : 'Platz ' + nr + ' herausgenommen — läuft aus, dann ist die Fläche wieder frei.');
 }
 
 // ---------------------------------------------------------------- Nebenseiten
