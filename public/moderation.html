@@ -29,6 +29,38 @@
   .pille.an{border-color:var(--gut);color:var(--gut)}
   .pille.aus{border-color:var(--warn);color:var(--warn)}
 
+  /* Spielzeiten. Der Balken steht immer da: am Abend ist der Startknopf der
+     wichtigste Knopf dieser Oberflaeche, und er darf nicht in einem Reiter
+     liegen, den man erst aufmachen muss. */
+  #spielbalken{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;
+    padding:9px 16px;border-bottom:1px solid var(--rand);background:var(--feld);font-size:.9rem}
+  #spielbalken .punkt{width:10px;height:10px;border-radius:50%;background:#4a5468;flex:0 0 auto}
+  #spielbalken.laeuft .punkt{background:var(--gut);box-shadow:0 0 0 4px rgba(95,208,138,.16)}
+  #spielbalken.laeuftAus .punkt{background:var(--gold);box-shadow:0 0 0 4px rgba(255,207,107,.16)}
+  #spielbalken.faellig .punkt{background:var(--unsicher);animation:pochen 1.1s ease-in-out infinite}
+  @keyframes pochen{0%,100%{box-shadow:0 0 0 0 rgba(255,91,74,.55)}50%{box-shadow:0 0 0 7px rgba(255,91,74,0)}}
+  #spielbalken .uhr{font-variant-numeric:tabular-nums;font-weight:650;color:var(--text)}
+  #spielbalken.faellig .uhr{color:var(--unsicher)}
+  #spielbalken.ohnePlan{color:var(--leise)}
+  #spielStart{background:var(--gut);color:#04240f;border:0;font-weight:650;padding:9px 18px;font-size:.92rem}
+  #spielAbbruch{border-color:var(--warn);color:var(--warn)}
+
+  /* Planzeilen. Eine Zeile ist eine Runde des Abends. */
+  .planzeile{display:grid;grid-template-columns:2.2rem auto auto auto 1fr auto;gap:10px;align-items:center;
+    padding:8px 0;border-bottom:1px solid var(--rand)}
+  .planzeile:last-child{border-bottom:0}
+  .planzeile .nr{color:var(--leise);font-variant-numeric:tabular-nums}
+  .planzeile input{background:var(--grund);color:var(--text);border:1px solid var(--rand);
+    border-radius:9px;padding:8px 10px;font:inherit;font-variant-numeric:tabular-nums;width:5.6rem;text-align:center}
+  .planzeile .lage{font-size:.8rem;color:var(--leise)}
+  .planzeile .lage.jetzt{color:var(--gut);font-weight:650}
+  .planzeile .lage.weg{color:#6b748b}
+  .planzeile .lage.verpasst{color:var(--gold)}
+  .planzeile .weck{background:none;border:0;color:var(--leise);font:inherit;cursor:pointer;padding:6px 10px;border-radius:8px}
+  .planzeile .weck:hover{color:var(--warn)}
+  .planzeile.laeuftgerade{background:rgba(95,208,138,.06)}
+  .trenner{color:var(--leise)}
+
   .seiten{display:flex;gap:14px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--rand);
     font-size:.82rem;color:var(--leise)}
   .seiten a{color:var(--gold);text-decoration:none}
@@ -126,11 +158,23 @@
     <button class="pille" id="sNachschub">Nachschub</button>
     <button class="pille" id="abmelden">Abmelden</button>
   </div>
-</header><nav>
+</header>
+
+<div id="spielbalken" hidden>
+  <span class="punkt"></span>
+  <span id="spielLage">–</span>
+  <span class="rechts">
+    <button class="pille" id="spielStart" hidden>Starten</button>
+    <button class="pille" id="spielAbbruch" hidden>Runde abbrechen</button>
+  </span>
+</div>
+
+<nav>
 <button data-ansicht="uebersicht" class="aktiv">Übersicht</button>
   <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
   <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
   <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
+  <button data-ansicht="spielzeiten">Spielzeiten</button>
   <button data-ansicht="werkzeuge">Werkzeuge</button>
 </nav>
 
@@ -148,6 +192,42 @@
   </section>
 
   <section id="liste" hidden></section>
+
+  <section id="spielzeiten" hidden>
+    <div class="karte">
+      <h2>Spielzeiten des Abends</h2>
+      <p class="fuss">Eine Zeile je Runde. Der <b>Anfang</b> ist unverbindlich — er speist nur den
+      Countdown und die Auskunft an die Absender; gestartet wird von Hand mit dem Knopf oben.
+      Das <b>Ende</b> ist verbindlich und heißt: <b>dann ist die Wand leer</b>. Der Nachschub hört
+      dafür eine Standzeit früher auf.<br>
+      Solange <b>keine</b> Zeile eingetragen ist, läuft die Fassade durch wie bisher.</p>
+      <div id="planTabelle"></div>
+      <div class="werkzeug">
+        <button class="pille" id="zeileDazu">Zeile hinzufügen</button>
+        <button class="pille" id="planSpeichern"
+          style="background:var(--gut);color:#04240f;border:0;font-weight:650">Speichern</button>
+        <span class="fuss" id="planStand"></span>
+      </div>
+    </div>
+
+    <div class="karte" style="margin-top:14px">
+      <h2>Zeiten erzeugen</h2>
+      <p class="fuss">Füllt die Tabelle im Raster der Mapping-Shows. Ersetzt die bestehenden Zeilen —
+      gespeichert wird erst mit „Speichern“ oben.</p>
+      <div class="werkzeug">
+        <span class="fuss">erste Runde endet</span>
+        <input id="genEnde" value="19:29" style="width:5.6rem;text-align:center">
+        <span class="fuss">alle</span>
+        <input id="genTakt" value="30" style="width:4rem;text-align:center">
+        <span class="fuss">Minuten,</span>
+        <input id="genAnzahl" value="7" style="width:4rem;text-align:center">
+        <span class="fuss">Runden zu je</span>
+        <input id="genDauer" value="17" style="width:4rem;text-align:center">
+        <span class="fuss">Minuten</span>
+        <button class="pille" id="genKnopf">Zeilen erzeugen</button>
+      </div>
+    </div>
+  </section>
 
   <section id="werkzeuge" hidden>
     <div class="karte">
@@ -205,6 +285,9 @@ let raus = new Set();       // im Raster herausgeklickte ids
 let listenVorrat = [];
 let rueckgaengigStapel = [];
 let stand = {};
+let sessionStand = null;    // Spielzeiten, kommt mit den Kennzahlen mit
+let zeitVersatz = 0;        // Serveruhr minus eigene Uhr
+let planZeilen = [];        // lokaler Bearbeitungsstand der Zeilentabelle
 
 start();
 
@@ -238,6 +321,13 @@ async function start () {
   el('rasterSpaeter').addEventListener('click', rasterSpaeter);
   el('rasterNeu').addEventListener('click', () => laden(true));
   el('leerenKnopf').addEventListener('click', leeren);
+  el('spielStart').addEventListener('click', spielStarten);
+  el('spielAbbruch').addEventListener('click', spielAbbrechen);
+  el('zeileDazu').addEventListener('click', () => { planZeilen.push({ von: '', bis: '' }); planZeichnen(); });
+  el('planSpeichern').addEventListener('click', planSpeichern);
+  el('genKnopf').addEventListener('click', zeitenErzeugen);
+  // Der Balken zaehlt selbst herunter, statt sekuendlich zu fragen.
+  setInterval(spielbalkenZeichnen, 1000);
   document.addEventListener('keydown', taste);
   window.addEventListener('resize', () => zeichnen());
   setInterval(zahlenHolen, 5000);
@@ -254,7 +344,7 @@ async function start () {
 // ---------------------------------------------------------------- Daten
 
 async function laden (frisch) {
-  if (ansicht === 'werkzeuge') { zeichnen(); return; }
+  if (ansicht === 'werkzeuge' || ansicht === 'spielzeiten') { zeichnen(); return; }
   if (ansicht === 'uebersicht') {
     const [r1, r2] = await Promise.all([
       fetch('/api/moderation/queue?ansicht=einzeln&grenze=60'),
@@ -315,6 +405,7 @@ function zahlenZeichnen () {
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
   el('leerenKnopf').disabled = !stand.darfLeeren;
+  if (stand.session) sessionSetzen(stand.session);
 }
 
 // ---------------------------------------------------------------- Zeichnen
@@ -328,7 +419,9 @@ function wechseln (neu) {
   el('raster').hidden = !haupt;
   el('liste').hidden = !['zurueckgestellt', 'pool', 'abgelehnt'].includes(neu);
   el('werkzeuge').hidden = neu !== 'werkzeuge';
+  el('spielzeiten').hidden = neu !== 'spielzeiten';
   document.querySelector('main').classList.toggle('uebersicht', haupt);
+  if (neu === 'spielzeiten') planHolen();
   laden(true);
 }
 
@@ -336,7 +429,7 @@ function zeichnen () {
   if (ansicht === 'uebersicht') { zeichnenEinzeln(); zeichnenRaster(); }
   else if (ansicht === 'einzeln') zeichnenEinzeln();
   else if (ansicht === 'raster') zeichnenRaster();
-  else if (ansicht !== 'werkzeuge') zeichnenListe();
+  else if (ansicht !== 'werkzeuge' && ansicht !== 'spielzeiten') zeichnenListe();
 }
 
 function buehneBauen () {
@@ -562,6 +655,230 @@ async function leeren () {
   if (antwort.ok) { el('leerenWort').value = ''; vorrat = []; rasterVorrat = []; listenVorrat = []; zahlenHolen(); }
 }
 
+// ---------------------------------------------------------------- Spielzeiten
+//
+// Der Balken oben lebt aus derselben Abfrage wie die Zahlen im Kopf. Herunter
+// zaehlt er selbst: der Server schickt absolute Zeitstempel und seine eigene
+// Uhr mit, daraus rechnet sich die Seite ihren Versatz und tickt im Sekundentakt
+// ohne dafuer sekuendlich zu fragen.
+
+function sessionSetzen (s) {
+  sessionStand = s;
+  if (typeof s.zeit === 'number') zeitVersatz = s.zeit - Date.now();
+  spielbalkenZeichnen();
+}
+
+function serverJetzt () { return Date.now() + zeitVersatz; }
+
+/** Sekunden als m:ss, ab einer Stunde als h:mm:ss. Negativ heisst ueberfaellig. */
+function dauerText (sekunden) {
+  const negativ = sekunden < 0;
+  let v = Math.abs(Math.floor(sekunden));
+  const st = Math.floor(v / 3600); v -= st * 3600;
+  const mi = Math.floor(v / 60), se = v - mi * 60;
+  const zwei = n => String(n).padStart(2, '0');
+  return (negativ ? '\u2212' : '') + (st ? st + ':' + zwei(mi) + ':' + zwei(se) : mi + ':' + zwei(se));
+}
+
+function minutenAus (wert) {
+  const m = /^\s*(\d{1,2})\s*[:.]\s*(\d{2})\s*$/.exec(String(wert || ''));
+  if (!m) return null;
+  const st = Number(m[1]), mi = Number(m[2]);
+  if (st > 23 || mi > 59) return null;
+  return st * 60 + mi;
+}
+
+function uhrzeitAus (minuten) {
+  const m = ((Math.round(minuten) % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+}
+
+function spielbalkenZeichnen () {
+  const s = sessionStand;
+  const balken = el('spielbalken');
+  if (!s) { balken.hidden = true; return; }
+  balken.hidden = false;
+
+  const jetzt = serverJetzt();
+  let klasse = '', text = '', zeigStart = false, zeigAbbruch = false, startText = '';
+
+  if (s.phase === 'ohnePlan') {
+    klasse = 'ohnePlan';
+    text = 'Keine Spielzeiten eingetragen — die Fassade läuft durch.';
+  } else if (s.aktuell) {
+    zeigAbbruch = true;
+    if (s.aktuell.phase === 'laeuftAus') {
+      klasse = 'laeuftAus';
+      text = 'Runde ' + s.aktuell.nr + ' läuft aus — nichts Neues mehr, leer in <span class="uhr">'
+        + dauerText((s.aktuell.ende - jetzt) / 1000) + '</span>';
+    } else {
+      klasse = 'laeuft';
+      text = 'Runde ' + s.aktuell.nr + ' läuft — noch <span class="uhr">'
+        + dauerText((s.aktuell.nachschubBis - jetzt) / 1000) + '</span> Nachschub, leer um '
+        + s.aktuell.endeUhrzeit;
+    }
+  } else if (s.kommend) {
+    zeigStart = true;
+    const bis = (s.kommend.startStempel - jetzt) / 1000;
+    const laenge = Math.max(0, Math.round((s.kommend.endeStempel - jetzt) / 60000));
+    if (bis < 0) {
+      klasse = 'faellig';
+      text = 'Runde ' + s.kommend.nr + ' überfällig seit <span class="uhr">' + dauerText(bis)
+        + '</span> — geplant war ' + s.kommend.geplantStart;
+    } else {
+      text = 'Nächste Runde ' + s.kommend.nr + ' in <span class="uhr">' + dauerText(bis)
+        + '</span> — geplant ' + s.kommend.geplantStart + ' bis ' + s.kommend.geplantEnde;
+    }
+    startText = 'Runde ' + s.kommend.nr + ' starten (' + laenge + ' min)';
+  } else {
+    text = 'Keine weitere Runde geplant.';
+  }
+
+  balken.className = klasse;
+  el('spielLage').innerHTML = text;
+  el('spielStart').hidden = !zeigStart;
+  if (zeigStart) el('spielStart').textContent = startText;
+  el('spielAbbruch').hidden = !zeigAbbruch;
+}
+
+async function spielStarten () {
+  const k = sessionStand && sessionStand.kommend;
+  if (!k) return;
+  // Das Ende bleibt, wo es geplant ist — ein spaeter Start verkuerzt die Runde.
+  // Genau deshalb steht die Restlaenge auf dem Knopf und wird ab hier gefragt:
+  // das soll man beim Klicken sehen und nicht hinterher merken.
+  const laenge = Math.max(0, Math.round((k.endeStempel - serverJetzt()) / 60000));
+  if (laenge < 10 && !confirm('Runde ' + k.nr + ' läuft dann nur noch ' + laenge
+      + ' Minuten — das Ende ' + k.geplantEnde + ' bleibt stehen.\n\nTrotzdem starten?')) return;
+  const antwort = await fetch('/api/moderation/session-starten', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}'
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) return melden(d.fehler || 'Start nicht möglich.');
+  sessionSetzen(d);
+  if (ansicht === 'spielzeiten') planHolen();
+  melden('Runde ' + d.aktuell.nr + ' läuft — leer um ' + d.aktuell.endeUhrzeit);
+}
+
+async function spielAbbrechen () {
+  if (!confirm('Laufende Runde abbrechen?\n\nEs kommt nichts Neues mehr an die Fassade, '
+    + 'Laufendes blendet nach seiner Standzeit aus.')) return;
+  const antwort = await fetch('/api/moderation/session-abbrechen', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}'
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) return melden(d.fehler || 'Nicht möglich.');
+  sessionSetzen(d);
+  if (ansicht === 'spielzeiten') planHolen();
+  melden('Runde abgebrochen — Laufendes läuft aus.');
+}
+
+// ---- Die Zeilentabelle
+// Sie wird bewusst NICHT im Takt der Kennzahlen neu gezeichnet: wer gerade eine
+// Uhrzeit tippt, will sie nicht unter den Fingern verlieren.
+
+async function planHolen () {
+  const antwort = await fetch('/api/moderation/sessionen');
+  if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+  const d = await antwort.json();
+  sessionSetzen(d);
+  planZeilen = d.zeilen.map(z => ({ von: z.geplantStart, bis: z.geplantEnde, lage: planLage(z, d) }));
+  planZeichnen();
+  el('planStand').textContent = '';
+}
+
+function planLage (z, s) {
+  if (z.abgebrochen) return { text: 'abgebrochen', art: 'weg' };
+  if (z.start !== null && z.ende !== null && z.ende > s.zeit) return { text: 'läuft gerade', art: 'jetzt' };
+  if (z.gelaufen) return { text: 'gelaufen', art: 'weg' };
+  if (z.verpasst) return { text: 'nicht gestartet', art: 'verpasst' };
+  return null;
+}
+
+function planZeichnen () {
+  const ziel = el('planTabelle');
+  ziel.innerHTML = '';
+  if (!planZeilen.length) {
+    const p = document.createElement('p');
+    p.className = 'fuss';
+    p.textContent = 'Noch keine Runde eingetragen — die Fassade läuft durch wie bisher.';
+    ziel.appendChild(p);
+    return;
+  }
+  planZeilen.forEach((z, i) => {
+    const zeile = document.createElement('div');
+    zeile.className = 'planzeile' + (z.lage && z.lage.art === 'jetzt' ? ' laeuftgerade' : '');
+
+    const nr = document.createElement('span');
+    nr.className = 'nr';
+    nr.textContent = (i + 1) + '.';
+
+    const von = document.createElement('input');
+    von.value = z.von; von.placeholder = '19:12'; von.setAttribute('aria-label', 'Anfang Runde ' + (i + 1));
+    von.addEventListener('input', () => { planZeilen[i].von = von.value; });
+
+    const strich = document.createElement('span');
+    strich.className = 'trenner'; strich.textContent = 'bis';
+
+    const bis = document.createElement('input');
+    bis.value = z.bis; bis.placeholder = '19:29'; bis.setAttribute('aria-label', 'Ende Runde ' + (i + 1));
+    bis.addEventListener('input', () => { planZeilen[i].bis = bis.value; });
+
+    const lage = document.createElement('span');
+    lage.className = 'lage' + (z.lage ? ' ' + z.lage.art : '');
+    lage.textContent = z.lage ? z.lage.text : '';
+
+    const weg = document.createElement('button');
+    weg.className = 'weck'; weg.textContent = 'entfernen';
+    weg.title = 'Diese Runde aus dem Plan nehmen';
+    weg.addEventListener('click', () => { planZeilen.splice(i, 1); planZeichnen(); });
+
+    for (const teil of [nr, von, strich, bis, lage, weg]) zeile.appendChild(teil);
+    ziel.appendChild(zeile);
+  });
+}
+
+async function planSpeichern () {
+  const antwort = await fetch('/api/moderation/sessionen', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ zeilen: planZeilen.map(z => ({ geplantStart: z.von, geplantEnde: z.bis })) })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { el('planStand').textContent = d.fehler || 'Nicht gespeichert.'; return; }
+  sessionSetzen(d);
+  planZeilen = d.zeilen.map(z => ({ von: z.geplantStart, bis: z.geplantEnde, lage: planLage(z, d) }));
+  planZeichnen();
+  el('planStand').textContent = d.zeilen.length
+    ? d.zeilen.length + ' Runden gespeichert.'
+    : 'Keine Runde eingetragen — die Fassade läuft durch.';
+  melden('Spielzeiten gespeichert.');
+}
+
+function zeitenErzeugen () {
+  const ende = minutenAus(el('genEnde').value);
+  const takt = Number(el('genTakt').value);
+  const anzahl = Number(el('genAnzahl').value);
+  const dauer = Number(el('genDauer').value);
+  if (ende === null) { el('planStand').textContent = 'Die erste Endzeit bitte als HH:MM.'; return; }
+  if (!(takt > 0) || !(anzahl > 0) || !(dauer > 0)) {
+    el('planStand').textContent = 'Takt, Anzahl und Dauer müssen Zahlen über null sein.'; return;
+  }
+  if (dauer >= takt) { el('planStand').textContent = 'Die Dauer muss kleiner als der Takt sein.'; return; }
+
+  const erzeugt = [];
+  let abgeschnitten = false;
+  for (let i = 0; i < Math.min(anzahl, 40); i++) {
+    const e = ende + i * takt;
+    // Keine Runde laeuft ueber Mitternacht — der Rest faellt weg statt umzuklappen.
+    if (e >= 1440 || e - dauer < 0) { abgeschnitten = true; break; }
+    erzeugt.push({ von: uhrzeitAus(e - dauer), bis: uhrzeitAus(e), lage: null });
+  }
+  planZeilen = erzeugt;
+  planZeichnen();
+  el('planStand').textContent = erzeugt.length + ' Zeilen erzeugt — noch nicht gespeichert.'
+    + (abgeschnitten ? ' Die späteren lägen nach Mitternacht und wurden weggelassen.' : '');
+}
+
 // ---------------------------------------------------------------- Nebenseiten
 
 // Die Nebenseite tritt an die Stelle der Moderation, statt unter ihr zu stehen —
@@ -578,7 +895,6 @@ function rahmenAuf (adresse, titel, verweis, unten) {
   document.querySelector('nav').hidden = !unten;
   document.querySelectorAll('.seiten a').forEach(a => a.classList.remove('offen'));
   if (verweis) verweis.classList.add('offen');
-  if (unten) el('zurModeration').classList.add('offen');
   window.scrollTo({ top: 0 });
 }
 
@@ -589,7 +905,6 @@ function rahmenZu () {
   document.querySelector('main').hidden = false;
   document.querySelector('nav').hidden = false;
   document.querySelectorAll('.seiten a').forEach(a => a.classList.remove('offen'));
-  el('zurModeration').classList.add('offen');
   window.focus();   // damit die Tastenkürzel wieder greifen
 }
 

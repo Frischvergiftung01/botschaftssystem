@@ -235,6 +235,9 @@ function stand (jetzt = Date.now()) {
       nr: l.nr,
       start: l.start,
       ende: l.ende,
+      // Ab hier kommt nichts Neues mehr an die Wand. Absolut, damit die
+      // Oberflaeche sekuendlich mitzaehlen kann, ohne sekuendlich zu fragen.
+      nachschubBis,
       endeUhrzeit: alsUhrzeit(l.geplant_ende),
       phase: jetzt < nachschubBis ? 'laeuft' : 'laeuftAus',
       restSekunden: Math.max(0, Math.round((l.ende - jetzt) / 1000)),
@@ -245,19 +248,27 @@ function stand (jetzt = Date.now()) {
   let kommend = null;
   if (n) {
     const startStempel = heuteUm(n.geplant_start, jetzt);
+    const endeStempel = heuteUm(n.geplant_ende, jetzt);
     kommend = {
       nr: n.nr,
       geplantStart: alsUhrzeit(n.geplant_start),
       geplantEnde: alsUhrzeit(n.geplant_ende),
+      startStempel,
+      endeStempel,
       // Negativ, wenn der geplante Start schon vorbei ist. Die Oberflaeche
       // zaehlt dann rot weiter — vergessen soll man den Knopf nicht.
       sekundenBisStart: Math.round((startStempel - jetzt) / 1000),
-      // Wie lang die Runde noch waere, wenn man jetzt startet.
-      laengeBeiSofortstartSekunden: Math.max(0, Math.round((heuteUm(n.geplant_ende, jetzt) - jetzt) / 1000))
+      // Wie lang die Runde noch waere, wenn man jetzt startet. Steht auf dem
+      // Knopf: ein spaeter Start verkuerzt die Runde, und das soll man im
+      // Moment des Klickens sehen und nicht hinterher merken.
+      laengeBeiSofortstartSekunden: Math.max(0, Math.round((endeStempel - jetzt) / 1000))
     };
   }
 
   return {
+    // Serveruhr, damit die Oberflaeche ihren eigenen Versatz herausrechnen
+    // und die Zeitstempel oben selbst herunterzaehlen kann.
+    zeit: jetzt,
     // ohnePlan heisst: die Spielzeiten sind gar nicht in Betrieb, das System
     // laeuft durch. Fuer die Oberflaeche ein anderer Zustand als eine Pause
     // zwischen zwei Runden, und er soll auch anders aussehen.

@@ -8,6 +8,7 @@
     "start": "node src/server.js",
     "seed": "node werkzeuge/seed.js",
     "test": "node werkzeuge/durchstich-test.js && node werkzeuge/filter-test.js && node werkzeuge/moderation-test.js && node werkzeuge/sperre-test.js && node werkzeuge/sessionen-test.js && node werkzeuge/sessionen-api-test.js && node werkzeuge/sessionen-scheduler-test.js",
+    "oberflaeche": "node werkzeuge/sessionen-oberflaeche-test.js",
     "messung": "node werkzeuge/mistral-messung.js",
     "queue-fuellen": "node werkzeuge/queue-fuellen.js"
   },
