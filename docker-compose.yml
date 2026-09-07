@@ -19,6 +19,9 @@ services:
       MODERATION_SITZUNG_STUNDEN: ${MODERATION_SITZUNG_STUNDEN:-14}
       RASTER_GROESSE: ${RASTER_GROESSE:-12}
       DATENBANK_LEEREN: ${DATENBANK_LEEREN:-true}
+      # Puls der Bridge (Block 6c). Leer = jeder Puls wird angenommen; gesetzt
+      # muss derselbe Wert in der einstellungen.json der Bridge stehen.
+      BRIDGE_TOKEN: ${BRIDGE_TOKEN:-}
       STANDZEIT: 25
       SPERRE_SEKUNDEN: ${SPERRE_SEKUNDEN:-120}
       MAX_ZEICHEN: 120

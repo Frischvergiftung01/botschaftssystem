@@ -26,6 +26,9 @@
   .zahlen{display:flex;gap:16px;flex-wrap:wrap;color:var(--leise);font-size:.85rem}
   .zahlen b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:650}
   .zahlen .achtung b{color:var(--unsicher)}
+  /* Lebt die Bridge? Am Abend die zweite Frage nach "wie viel liegt an". */
+  .zahlen .fassade b.laeuft{color:var(--gut)}
+  .zahlen .fassade b.still{color:var(--unsicher)}
   .rechts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
   .pille{background:var(--feld);color:var(--text);border:1px solid var(--rand);border-radius:999px;
     padding:6px 12px;font:inherit;font-size:.82rem;cursor:pointer;white-space:nowrap}
@@ -187,6 +190,7 @@
     <span>letzte 5 min <b id="z5">–</b></span>
     <span>Durchsatz <b id="zDurchsatz">–</b>/h</span>
     <span class="hinweise" id="zHinweiseFeld" hidden>Hinweise <b id="zHinweise">–</b></span>
+    <span class="fassade" title="Meldet sich die Bridge auf dem Medien-PC?">Fassade <b id="zFassade">–</b></span>
   </div>
   <div class="rechts">
     <button class="pille" id="sAuto">Auto-Freigabe</button>
@@ -522,6 +526,7 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  fassadeZeichnen();
   const ein = stand.schalter.einrichtung === true;
   el('einrichtungsbalken').hidden = !ein;
   el('sEinrichtung').textContent = 'Einrichtungsmodus ' + (ein ? 'an' : 'aus');
@@ -543,6 +548,37 @@ function zahlenZeichnen () {
   const scharfe = stand.hinweiseScharf || 0;
   el('zHinweiseFeld').hidden = scharfe === 0;
   el('zHinweise').textContent = scharfe;
+}
+
+/**
+ * Der Fassadenstand im Kopf. Er beantwortet die Frage, die man sonst nur durch
+ * Hinlaufen klaeren kann: steht die Wand still, weil nichts freigegeben ist,
+ * oder weil auf dem Medien-PC etwas haengt?
+ */
+function fassadeZeichnen () {
+  const feld = el('zFassade');
+  const b = stand.bridge;
+  if (!b || !b.gemeldet) {
+    feld.textContent = 'keine Bridge';
+    feld.className = '';
+    feld.parentElement.title = 'Es hat sich noch keine Bridge gemeldet. '
+      + 'Läuft auf dem Medien-PC start-bridge.cmd?';
+    return;
+  }
+  const s = b.stand || {};
+  if (b.frisch) {
+    feld.textContent = s.clipLaeuft === false ? 'verbunden, Clip aus' : 'verbunden';
+    feld.className = 'laeuft';
+  } else {
+    feld.textContent = b.vorSekunden < 120
+      ? 'still seit ' + b.vorSekunden + ' s'
+      : 'still seit ' + Math.round(b.vorSekunden / 60) + ' min';
+    feld.className = 'still';
+  }
+  feld.parentElement.title = `Letzter Puls vor ${b.vorSekunden} s · `
+    + `${s.wechsel || 0} Wechsel · ${s.arenaFehler || 0} Arena-Fehler · `
+    + `${s.serverFehler || 0} Server-Fehler`
+    + (s.layer ? ` · Layer ${s.layer}, Spalte ${s.spalte}` : '');
 }
 
 // ---------------------------------------------------------------- Zeichnen

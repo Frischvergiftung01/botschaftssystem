@@ -18,6 +18,7 @@ const { FLAECHEN } = require('./flaechen');
 const { groesseFuer } = require('./text');
 const scheduler = require('./scheduler');
 const einstellungen = require('./einstellungen');
+const puls = require('./puls');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
 
@@ -157,6 +158,8 @@ function kennzahlen () {
     // das Abnahmekriterium von 500 Entscheidungen je Stunde gemessen wird.
     durchsatzProStunde: letzte5 * 12,
     schalter: einstellungen.schalter(),
+    // Lebt die Bridge? Der Server sieht sie nur, wenn sie sich meldet.
+    bridge: puls.stand(),
     // Der Sessionstand faehrt hier mit, damit der Balken oben in der Oberflaeche
     // aus derselben Abfrage lebt wie die Zahlen — eine Anfrage statt zwei.
     session: sessionen.stand(),

@@ -57,6 +57,9 @@ async function balkenText (seite) {
     await seite.goto(BASIS + '/moderation', { waitUntil: 'networkidle' });
     pruefe('die Seite ist die Moderation', await seite.locator('.marke').isVisible());
     pruefe('der Spielzeitenbalken ist da', await seite.locator('#spielbalken').isVisible());
+    pruefe('der Kopf sagt, dass sich keine Bridge gemeldet hat',
+      /keine Bridge/.test(await seite.locator('#zFassade').textContent()),
+      await seite.locator('#zFassade').textContent());
     pruefe('ohne Plan sagt er das auch', /läuft durch/.test(await balkenText(seite)), await balkenText(seite));
     pruefe('kein Startknopf ohne Plan', await seite.locator('#spielStart').isHidden());
     pruefe('die Warteschlange steht noch', await seite.locator('#raster').isVisible());

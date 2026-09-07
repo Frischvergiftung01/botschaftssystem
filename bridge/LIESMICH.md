@@ -33,11 +33,15 @@ der Server, nie ein Fehler.
    | `arena` | Arena auf demselben Rechner: `http://127.0.0.1:8080/api/v1` |
    | `taktMs` | wie oft der Server gefragt wird (500 = zweimal je Sekunde) |
    | `blendeMs` | Blendenzeit; **muss zum Smooth-Knoten im Patch passen** (0,35 s) |
+   | `token` | nur nötig, wenn am Server `BRIDGE_TOKEN` gesetzt ist — derselbe Wert |
 
 ## Im Betrieb
 
 Das Fenster **offen lassen** — es ist die Bridge. Es zeigt jeden Wechsel und alle 30 Sekunden
 eine Standzeile. Mitgeschrieben wird zusätzlich nach `logs\bridge-JJJJ-MM-TT.log`.
+
+Alle fünf Sekunden meldet sich die Bridge beim Server. In der Moderation steht dadurch oben
+**Fassade verbunden**; bleibt sie aus, sieht man dort sofort, dass es am Medien-PC klemmt.
 
 Stürzt die Bridge ab, startet das Skript sie nach 5 Sekunden neu. Soll sie *aus* bleiben:
 Fenster schließen.

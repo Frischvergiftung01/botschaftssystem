@@ -32,6 +32,7 @@ const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
 const belegungsplan = require('./belegungsplan');
+const puls = require('./puls');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
 
@@ -243,7 +244,32 @@ fastify.get('/api/probe', async (req) => {
   };
 });
 
-fastify.get('/api/gesundheit', async () => ({ ok: true, zeit: Date.now() }));
+fastify.get('/api/gesundheit', async () => ({ ok: true, zeit: Date.now(), bridge: puls.stand() }));
+
+// ---------------------------------------------------------------- Puls der Bridge
+//
+// Offen, aber mit optionalem Kennwort: steht BRIDGE_TOKEN in der Umgebung,
+// muss die Bridge es mitschicken. Ohne gesetzten Wert ist der Endpunkt frei —
+// schlimmstenfalls behauptet jemand, die Fassade laufe. Schaden richtet das
+// nicht an, denn hier wird nichts gesteuert; angezeigt wird es nur.
+fastify.post('/api/bridge/puls', async (req, reply) => {
+  if (cfg.bridgeToken && String(req.headers['x-bridge-token'] || '') !== cfg.bridgeToken) {
+    return reply.code(401).send({ fehler: 'Falsches oder fehlendes Bridge-Kennwort.' });
+  }
+  const k = req.body || {};
+  return {
+    ok: true,
+    ...puls.melden({
+      wechsel: Number(k.wechsel) || 0,
+      arenaFehler: Number(k.arenaFehler) || 0,
+      serverFehler: Number(k.serverFehler) || 0,
+      layer: k.layer ?? null,
+      spalte: k.spalte ?? null,
+      clipLaeuft: k.clipLaeuft === true,
+      flaechen: Number(k.flaechen) || 0
+    })
+  };
+});
 
 // ---------------------------------------------------------------- Moderation (Block 5)
 

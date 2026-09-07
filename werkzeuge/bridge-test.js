@@ -26,6 +26,7 @@ process.env.PORT = process.env.PORT || '3997';
 process.env.HOST = '127.0.0.1';
 process.env.MODERATION_KENNWORT = 'probe-kennwort-2026';
 process.env.MISTRAL_API_KEY = '';
+process.env.BRIDGE_TOKEN = 'probe-bridge-token';
 process.env.LOG_LEVEL = 'silent';
 for (const e of ['', '-wal', '-shm']) fs.rmSync(process.env.DB_PFAD + e, { force: true });
 
@@ -161,7 +162,8 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
     server: BASIS, arena: `http://127.0.0.1:${arenaPort}/api/v1`,
     // Der Waechter sieht im Betrieb alle 15 s nach; hier soll der Test nicht
     // so lange warten muessen.
-    taktMs: 200, blendeMs: 350, wachtMs: 800, ruhig: true
+    taktMs: 200, blendeMs: 350, wachtMs: 800, pulsMs: 500,
+    token: process.env.BRIDGE_TOKEN, ruhig: true
   });
   await schlaf(1500);
   {
@@ -209,6 +211,29 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
     pruefe('der Text wird nur einmal geschrieben',
       danach.filter(e => e.id === arena.textIdFuer(nr)).length === 1,
       JSON.stringify(danach.map(e => [e.id, e.wert])));
+  }
+
+  console.log('\nPuls: die Moderation sieht, ob die Bridge lebt');
+  {
+    const ohne = await fastify.inject({ method: 'POST', url: '/api/bridge/puls', payload: { wechsel: 1 } });
+    pruefe('ohne Kennwort wird der Puls abgewiesen', ohne.statusCode === 401, ohne.statusCode);
+
+    const g = (await fastify.inject({ method: 'GET', url: '/api/gesundheit' })).json();
+    pruefe('die Bridge hat sich gemeldet', g.bridge.gemeldet === true);
+    pruefe('und der Puls ist frisch', g.bridge.frisch === true, JSON.stringify(g.bridge));
+    pruefe('er sagt, wohin geschrieben wird', g.bridge.stand.flaechen === FLAECHEN.length,
+      JSON.stringify(g.bridge.stand));
+
+    // Und die Moderation zeigt denselben Stand.
+    const an = await fastify.inject({
+      method: 'POST', url: '/api/moderation/anmelden', payload: { kennwort: 'probe-kennwort-2026' }
+    });
+    const keks = an.headers['set-cookie'];
+    const k = (await fastify.inject({
+      method: 'GET', url: '/api/moderation/kennzahlen', headers: { cookie: keks }
+    })).json();
+    pruefe('die Kennzahlen tragen ihn mit', k.bridge && k.bridge.frisch === true,
+      JSON.stringify(k.bridge));
   }
 
   console.log('\nServer weg: die Wand behaelt ihren Stand');

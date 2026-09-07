@@ -35,6 +35,11 @@ const VORGABE = {
   fehlerBisNeuverbinden: 5,
   // Wie oft nachgesehen wird, ob der beschriebene Clip noch laeuft.
   wachtMs: 15000,
+  // Lebenszeichen an den Server. Die Moderation zeigt daran, ob die Fassade
+  // bedient wird — steht die Wand still, ist sonst nicht zu unterscheiden, ob
+  // nichts freigegeben ist oder ob hier etwas haengt.
+  pulsMs: 5000,
+  token: '',
   ruhig: false,
   // Wohin mitgeschrieben wird. Leer = nur Fenster. Beim Start ueber
   // start-bridge.cmd steht hier "logs" — nach dem Abend will man nachsehen
@@ -52,6 +57,7 @@ function einstellungen (zusatz = {}) {
   if (process.env.BRIDGE_TAKT_MS) e.taktMs = Number(process.env.BRIDGE_TAKT_MS);
   if (process.env.BRIDGE_BLENDE_MS) e.blendeMs = Number(process.env.BRIDGE_BLENDE_MS);
   if (process.env.BRIDGE_LOG) e.logOrdner = process.env.BRIDGE_LOG;
+  if (process.env.BRIDGE_TOKEN) e.token = process.env.BRIDGE_TOKEN;
   return { ...e, ...zusatz };
 }
 
@@ -83,6 +89,8 @@ function starten (zusatz = {}) {
 
   let verbindung = null;      // { pfad, flaechen, layer, spalte, ... }
   let letzteWacht = 0;
+  let letzterPuls = 0;
+  let pulsGeklagt = false;
   let laeuft = true;
   let arenaFehler = 0;
   const zahlen = { wechsel: 0, serverFehler: 0, arenaFehler: 0, letzteAntwortMs: 0 };
@@ -213,12 +221,43 @@ function starten (zusatz = {}) {
     }
   }
 
+  /**
+   * Lebenszeichen. Absichtlich ohne await im Takt und ohne Wiederholung: ein
+   * verpasster Puls ist belanglos, der naechste kommt in fuenf Sekunden. Was
+   * hier nicht passieren darf, ist die Fassade aufzuhalten.
+   */
+  function pulsen () {
+    if (Date.now() - letzterPuls < e.pulsMs) return;
+    letzterPuls = Date.now();
+    const kopf = { 'content-type': 'application/json' };
+    if (e.token) kopf['x-bridge-token'] = e.token;
+    fetch(e.server + '/api/bridge/puls', {
+      method: 'POST',
+      headers: kopf,
+      body: JSON.stringify({
+        wechsel: zahlen.wechsel,
+        arenaFehler: zahlen.arenaFehler,
+        serverFehler: zahlen.serverFehler,
+        layer: verbindung?.layer ?? null,
+        spalte: verbindung?.spalte ?? null,
+        clipLaeuft: !!verbindung?.verbunden,
+        flaechen: verbindung ? verbindung.flaechen.size : 0
+      })
+    }).then(a => {
+      if (a.ok || pulsGeklagt) return;
+      pulsGeklagt = true;
+      sagen('Der Puls wird abgewiesen (' + a.status + ') — läuft weiter, '
+        + 'nur die Moderation sieht die Bridge dann nicht.');
+    }).catch(() => { /* Netz weg: merkt der Takt ohnehin */ });
+  }
+
   async function takt () {
     if (!verbindung) {
       try { await verbinden(); } catch (fehler) { sagen('Arena: ' + fehler.message); return; }
     }
     await wachen();
     if (!verbindung) return;                 // der Waechter hat sie verworfen
+    pulsen();
     const daten = await anzeigeHolen();
     if (!daten) return;
     if (zahlen.serverFehler && zahlen.letzteAntwortMs) {

@@ -73,6 +73,10 @@ module.exports = {
   // nachgerechnet wird.
   planHorizontSekunden: Number(process.env.PLAN_HORIZONT || 180),
 
+  // Puls der Bridge. Leer = der Endpunkt nimmt jeden Puls an; gesetzt = die
+  // Bridge muss denselben Wert in ihrer einstellungen.json stehen haben.
+  bridgeToken: (process.env.BRIDGE_TOKEN || '').trim(),
+
   // Anzeige
   standzeitSekunden: Number(process.env.STANDZEIT || 25),
   blendeSekunden: 0.35,          // muss zum Patch passen (Smooth-Knoten)
