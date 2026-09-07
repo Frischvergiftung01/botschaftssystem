@@ -34,6 +34,7 @@ const hinweise = require('./hinweise');
 const fuellsel = require('./fuellsel');
 const belegungsplan = require('./belegungsplan');
 const puls = require('./puls');
+const sendungen = require('./sendungen');
 
 fastify.register(require('@fastify/static'), { root: path.join(__dirname, '..', 'public') });
 
@@ -73,6 +74,17 @@ fastify.post('/api/botschaft', async (req, reply) => {
   const fremd = filter.nichtDarstellbar(text + name);
   if (fremd.length) {
     return reply.code(400).send({ fehler: `Diese Zeichen können wir auf der Fassade nicht darstellen: ${fremd.join(' ')}` });
+  }
+
+  // Derselbe Absendeversuch schon einmal da? Dann die alte Antwort wiederholen,
+  // statt eine zweite Botschaft anzulegen. Das steht VOR der Gerätesperre: ein
+  // Wiederholungsversuch darf nicht an ihr scheitern, sonst sähe der Absender
+  // eine Sperre für eine Botschaft, die längst angenommen ist.
+  const sendung = req.body?.sendung;
+  const schonDa = sendungen.finden(sendung);
+  if (schonDa) {
+    req.log.info({ code: schonDa.code }, 'Wiederholter Absendeversuch — alte Antwort');
+    return reply.code(schonDa.code).send({ ...schonDa.antwort, wiederholt: true });
   }
 
   // Wer an der Moderation angemeldet ist, sendet vom Haus aus: keine Gerätesperre
@@ -121,16 +133,22 @@ fastify.post('/api/botschaft', async (req, reply) => {
   // ihn umschreiben.
   if (status === 'abgelehnt') {
     req.log.info({ id: info.lastInsertRowid, pruefung }, 'Botschaft abgelehnt');
-    return reply.code(422).send({ fehler: cfg.textAblehnung, ...(vomPlatz ? { pruefung } : {}) });
+    const abgelehnt = { fehler: cfg.textAblehnung, ...(vomPlatz ? { pruefung } : {}) };
+    // Auch eine Ablehnung wird gemerkt: sonst legt der Wiederholungsversuch
+    // dieselbe abgelehnte Botschaft ein zweites Mal in das Protokoll.
+    sendungen.merken(sendung, 422, abgelehnt);
+    return reply.code(422).send(abgelehnt);
   }
 
   const voll = name ? `${text} — ${name}` : text;
   const passend = passendeFlaechen(voll, FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe);
   // Die Sperrzeit geht mit zurueck: die Seiten zeigen daraus den Countdown und
   // halten den Knopf "noch eine Botschaft" so lange geschlossen.
-  return { token, id: info.lastInsertRowid, status, passendeFlaechen: passend.length,
+  const antwort = { token, id: info.lastInsertRowid, status, passendeFlaechen: passend.length,
     sperreSekunden: vomPlatz ? 0 : cfg.sperreProGeraetSekunden,
     ...(vomPlatz ? { pruefung } : {}) };
+  sendungen.merken(sendung, 200, antwort);
+  return antwort;
 });
 
 // ---------------------------------------------------------------- Status je Absender

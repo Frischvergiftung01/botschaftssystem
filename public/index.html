@@ -229,30 +229,121 @@ if (letzte) {
   rueckkehr.textContent = `Deine letzte Botschaft ansehen: „${kurz}"`;
 }
 
-document.getElementById('formular').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  senden.disabled = true; fehler.textContent = '';
+// ------------------------------------------------------- Absenden mit Netzloch
+//
+// Auf einem vollen Platz bricht die Mobilfunkverbindung genau im falschen
+// Moment weg. Drei Dinge fangen das auf:
+//
+// 1. ENTWURF SICHERN, bevor gesendet wird. Wer die Seite wegwischt oder dessen
+//    Tab das Handy entlaedt, findet seinen Text beim naechsten Aufruf wieder.
+// 2. VON SELBST NACHSCHICKEN, dreimal mit wachsendem Abstand, und sofort
+//    wieder, sobald der Browser meldet, dass er online ist.
+// 3. EINE KENNUNG JE VERSUCH. Kam die Botschaft schon an und ging nur die
+//    Antwort verloren, gibt der Server dieselbe Antwort noch einmal, statt
+//    eine zweite Botschaft anzulegen oder die Geraetesperre zu ziehen. Die
+//    Kennung gilt fuer GENAU diesen Wortlaut — wer seinen Text aendert,
+//    bekommt eine neue.
+
+const ENTWURF = 'entwurf';
+const ABSTAENDE = [2000, 5000, 10000];   // zwischen den Versuchen
+
+function entwurfLesen () {
   try {
-    const antwort = await fetch('/api/botschaft', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ text: text.value, name: name.value, geraet })
-    });
-    const daten = await antwort.json();
-    if (!antwort.ok) {
-      fehler.textContent = daten.fehler || 'Das hat nicht geklappt.';
-      // Bei "zu schnell" weiss der Server, wie lange noch — daraus laeuft der Countdown.
-      if (daten.wartenSekunden) localStorage.setItem(SPERRE, String(Date.now() + daten.wartenSekunden * 1000));
-      senden.disabled = false;
-      sperreZeigen();
-      return;
-    }
-    merken(daten.token, vollerText());
-    localStorage.setItem(SPERRE, String(Date.now() + (daten.sperreSekunden || 120) * 1000));
-    localStorage.setItem('token', daten.token);
-    location.href = '/status?t=' + encodeURIComponent(daten.token);
-  } catch (err) {
-    fehler.textContent = 'Keine Verbindung. Noch einmal versuchen?';
+    const e = JSON.parse(localStorage.getItem(ENTWURF) || 'null');
+    // Nach einer halben Stunde ist ein Entwurf kein Entwurf mehr, sondern eine
+    // Ueberraschung.
+    if (!e || Date.now() - e.zeit > 30 * 60 * 1000) return null;
+    return e;
+  } catch (err) { return null; }
+}
+function entwurfSchreiben (e) { try { localStorage.setItem(ENTWURF, JSON.stringify(e)); } catch (err) {} }
+function entwurfLoeschen () { try { localStorage.removeItem(ENTWURF); } catch (err) {} }
+
+let laeuftAbsenden = false;
+let nachschickWecker = null;
+
+/** Ein Versuch. Gibt zurueck, ob es weitergehen soll. */
+async function versuch (entwurf) {
+  const antwort = await fetch('/api/botschaft', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ text: entwurf.text, name: entwurf.name, geraet, sendung: entwurf.sendung })
+  });
+  const daten = await antwort.json();
+  if (!antwort.ok) {
+    entwurfLoeschen();
+    fehler.textContent = daten.fehler || 'Das hat nicht geklappt.';
+    if (daten.wartenSekunden) localStorage.setItem(SPERRE, String(Date.now() + daten.wartenSekunden * 1000));
     senden.disabled = false;
+    sperreZeigen();
+    return;
+  }
+  entwurfLoeschen();
+  merken(daten.token, entwurf.text + (entwurf.name ? ' — ' + entwurf.name : ''));
+  localStorage.setItem(SPERRE, String(Date.now() + (daten.sperreSekunden || 120) * 1000));
+  localStorage.setItem('token', daten.token);
+  location.href = '/status?t=' + encodeURIComponent(daten.token);
+}
+
+async function absenden (entwurf) {
+  if (laeuftAbsenden) return;
+  laeuftAbsenden = true;
+  senden.disabled = true;
+  fehler.textContent = '';
+  try {
+    for (let i = 0; i <= ABSTAENDE.length; i++) {
+      try {
+        await versuch(entwurf);
+        return;                       // durch (oder mit Grund abgewiesen)
+      } catch (err) {
+        if (i === ABSTAENDE.length) break;
+        fehler.textContent = `Kein Netz — wird nachgeschickt (Versuch ${i + 2} von ${ABSTAENDE.length + 1}).`;
+        await new Promise(r => { nachschickWecker = setTimeout(r, ABSTAENDE[i]); });
+      }
+    }
+    // Alle Versuche vorbei: der Entwurf bleibt liegen, und sobald das Handy
+    // wieder online meldet, geht es von selbst weiter.
+    fehler.textContent = 'Kein Netz. Deine Botschaft ist gespeichert und wird '
+      + 'abgeschickt, sobald du wieder Empfang hast.';
+    senden.disabled = false;
+  } finally {
+    laeuftAbsenden = false;
+  }
+}
+
+document.getElementById('formular').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const alt = entwurfLesen();
+  const gleicherWortlaut = alt && alt.text === text.value && alt.name === name.value;
+  const entwurf = {
+    text: text.value,
+    name: name.value,
+    // Nur bei unveraendertem Wortlaut dieselbe Kennung weiterverwenden —
+    // sonst bekaeme ein geaenderter Text die Antwort auf den alten.
+    sendung: gleicherWortlaut ? alt.sendung : crypto.randomUUID(),
+    zeit: Date.now()
+  };
+  entwurfSchreiben(entwurf);
+  absenden(entwurf);
+});
+
+// Beim Aufschlag: liegt noch ein Entwurf da, der es nicht hinausgeschafft hat?
+(function entwurfAufnehmen () {
+  const e = entwurfLesen();
+  if (!e || !e.text) return;
+  text.value = e.text;
+  if (e.name) name.value = e.name;
+  aktualisieren();
+  fehler.textContent = 'Deine Botschaft von vorhin ist noch da — sie wurde nicht abgeschickt.';
+  if (navigator.onLine) absenden(e);
+})();
+
+// Der Browser sagt Bescheid, wenn er wieder Empfang hat. Das ist der schnellste
+// Weg zurueck — schneller als jeder Abstand, den wir raten koennten.
+window.addEventListener('online', () => {
+  const e = entwurfLesen();
+  if (e && e.text && !laeuftAbsenden) {
+    clearTimeout(nachschickWecker);
+    absenden(e);
   }
 });
 </script>
