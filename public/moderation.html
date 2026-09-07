@@ -18,6 +18,10 @@
 
   header{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;
     padding:10px 16px;border-bottom:1px solid var(--rand);position:sticky;top:0;background:var(--grund);z-index:5}
+  /* Muss ganz oben stehen und laut sein: `hidden` wird sonst von jeder Regel
+     mit hoeherer Spezifitaet ueberstimmt (#balken{display:flex} etwa), und
+     ausgeblendete Balken blieben mit altem Inhalt stehen. */
+  [hidden]{display:none !important}
   .marke{font-weight:650}
   .zahlen{display:flex;gap:16px;flex-wrap:wrap;color:var(--leise);font-size:.85rem}
   .zahlen b{color:var(--text);font-variant-numeric:tabular-nums;font-weight:650}
@@ -42,6 +46,13 @@
   #spielbalken .uhr{font-variant-numeric:tabular-nums;font-weight:650;color:var(--text)}
   #spielbalken.faellig .uhr{color:var(--unsicher)}
   #spielbalken.ohnePlan{color:var(--leise)}
+  /* Einrichtungsmodus. Der Balken ist absichtlich laut: ein Modus, den man am
+     Abend zu beenden vergisst, ist eine Wand voller Flaechennamen. */
+  #einrichtungsbalken{display:flex;gap:10px 14px;align-items:center;flex-wrap:wrap;
+    padding:10px 16px;background:rgba(255,91,74,.16);border-bottom:1px solid var(--unsicher);
+    color:var(--unsicher);font-size:.9rem;font-weight:650}
+  #einrichtungsbalken .leiser{color:var(--text);font-weight:400}
+  #einrichtungAus{border-color:var(--unsicher);color:var(--unsicher)}
   #spielStart{background:var(--gut);color:#04240f;border:0;font-weight:650;padding:9px 18px;font-size:.92rem}
   #spielAbbruch{border-color:var(--warn);color:var(--warn)}
 
@@ -193,6 +204,13 @@
   </span>
 </div>
 
+<div id="einrichtungsbalken" hidden>
+  <span>Einrichtungsmodus</span>
+  <span class="leiser">Die Fassade zeigt ihre Flächennamen. Keine Botschaften, kein Nachschub —
+  nichts wird als gezeigt gezählt.</span>
+  <span class="rechts"><button class="pille" id="einrichtungAus">Beenden</button></span>
+</div>
+
 <nav>
 <button data-ansicht="uebersicht" class="aktiv">Übersicht</button>
   <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
@@ -298,6 +316,18 @@
       Botschaften laufen aus. Einzelne Botschaften nimmt „Auf der Fassade → Sperren“ sofort herunter.</p>
     </div>
     <div class="karte" style="margin-top:14px">
+      <h2>Einrichtungsmodus</h2>
+      <p class="fuss">Für den Aufbau vor Ort: jede Fläche zeigt ihren eigenen Namen
+      („17 Mitte 01“), damit sich Slices zuordnen und ausrichten lassen.<br>
+      Solange er an ist, ruht der Nachschub. Die Namen entstehen erst beim Ausliefern —
+      es entsteht <b>keine Botschaft</b>, nichts wird gezählt, die Kennzahlen des Abends
+      bleiben sauber. Ausschalten genügt, aufzuräumen gibt es nichts.</p>
+      <div class="werkzeug">
+        <button class="pille" id="sEinrichtung">Einrichtungsmodus</button>
+        <span class="fuss" id="einrichtungStand"></span>
+      </div>
+    </div>
+    <div class="karte" style="margin-top:14px">
       <h2>Belegungsplan</h2>
       <p class="fuss">Der Plan bucht die Flächen einige Minuten im Voraus — nur dadurch kann die
       Statusseite dem Absender vorher sagen, <b>wo</b> seine Botschaft erscheint.<br>
@@ -395,6 +425,8 @@ async function start () {
   el('sAuto').addEventListener('click', () => schalten('autoFreigabe'));
   el('sNachschub').addEventListener('click', () => schalten('nachschub'));
   el('sPlan').addEventListener('click', () => schalten('belegungsplan'));
+  el('sEinrichtung').addEventListener('click', () => schalten('einrichtung'));
+  el('einrichtungAus').addEventListener('click', () => schalten('einrichtung'));
   el('rasterFreigeben').addEventListener('click', rasterFreigeben);
   el('rasterSpaeter').addEventListener('click', rasterSpaeter);
   el('rasterNeu').addEventListener('click', () => laden(true));
@@ -490,6 +522,13 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  const ein = stand.schalter.einrichtung === true;
+  el('einrichtungsbalken').hidden = !ein;
+  el('sEinrichtung').textContent = 'Einrichtungsmodus ' + (ein ? 'an' : 'aus');
+  el('sEinrichtung').className = 'pille ' + (ein ? 'aus' : 'an');  // an = Normalbetrieb
+  el('einrichtungStand').textContent = ein
+    ? 'Läuft — die Fassade zeigt Flächennamen.'
+    : 'Aus — Normalbetrieb.';
   const p = stand.schalter.belegungsplan !== false;
   el('sPlan').textContent = 'Belegungsplan ' + (p ? 'an' : 'aus');
   el('sPlan').className = 'pille ' + (p ? 'an' : 'aus');
@@ -738,6 +777,7 @@ function rasterSpaeter () {
 async function schalten (name) {
   const wert = !stand.schalter[name];
   if (name === 'autoFreigabe' && wert && !confirm('Auto-Freigabe wieder einschalten? Saubere Botschaften gehen dann ohne Moderation an die Fassade.')) return;
+  if (name === 'einrichtung' && wert && !confirm('Einrichtungsmodus einschalten? Die Fassade zeigt dann Flächennamen statt Botschaften, und der Nachschub ruht.')) return;
   if (name === 'belegungsplan' && !wert && !confirm('Belegungsplan abschalten? Die Fassade läuft weiter, aber die Statusseite kann dem Absender dann nicht mehr sagen, wo seine Botschaft erscheint.')) return;
   const antwort = await fetch('/api/moderation/schalter', {
     method: 'POST', headers: { 'content-type': 'application/json' },
@@ -749,7 +789,10 @@ async function schalten (name) {
   melden({
     autoFreigabe: 'Auto-Freigabe ' + (wert ? 'an — saubere Botschaften gehen ohne Moderation durch' : 'aus — alles geht durch die Moderation'),
     nachschub: 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'),
-    belegungsplan: 'Belegungsplan ' + (wert ? 'an — Flächen werden wieder im Voraus gebucht' : 'aus — der Scheduler entscheidet erst beim Wechsel')
+    belegungsplan: 'Belegungsplan ' + (wert ? 'an — Flächen werden wieder im Voraus gebucht' : 'aus — der Scheduler entscheidet erst beim Wechsel'),
+    einrichtung: wert
+      ? 'Einrichtungsmodus an — die Fassade zeigt Flächennamen'
+      : 'Einrichtungsmodus beendet — die Botschaften laufen wieder'
   }[name]);
 }
 

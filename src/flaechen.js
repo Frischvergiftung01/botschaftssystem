@@ -67,4 +67,24 @@ function ortsangabe (f) {
   return { kurz: wo + ', ' + n + '. Säule', seite: f.gruppe === 'mitte' ? 'mitte' : f.gruppe };
 }
 
-module.exports = { FLAECHEN, BANDHOEHE, ortsangabe };
+/**
+ * Beschriftung fuer den Einrichtungsmodus: Nummer plus Kurzname, so wie die
+ * Felder im Wire-Patch heissen ("17 Mitte 01").
+ *
+ * Sie steht NUR waehrend des Einrichtens auf der Wand und entsteht im Moment
+ * der Auslieferung — es gibt dafuer keine Botschaft, keine Zeile, keine
+ * Zaehlung. Auf den schmalen Flaechen wird bewusst gekuerzt: der Patch zieht
+ * den Text auf die Flaechenbreite, und ein langer Name wird dort winzig.
+ */
+function einrichtungName (f) {
+  const nr = String(f.nr).padStart(2, '0');
+  if (f.gruppe === 'stirn') return `${nr} ${f.name}`;
+  if (f.gruppe === 'portal') {
+    const seite = f.name.includes('linkes') ? 'li' : 're';
+    const welche = (/Säule (\d+)/.exec(f.name) || [])[1] || '';
+    return `${nr} Portal ${seite} ${welche}`;
+  }
+  return `${nr} ${f.name.replace(/^Säule /, '')}`;
+}
+
+module.exports = { FLAECHEN, BANDHOEHE, ortsangabe, einrichtungName };

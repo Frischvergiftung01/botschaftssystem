@@ -119,7 +119,11 @@ function jetzt () { return Date.now(); }
  * was steht, läuft in beiden Fällen normal aus.
  */
 function nachladenErlaubt () {
-  if (!einstellungen.schalter().nachschub) return false;
+  const s = einstellungen.schalter();
+  if (!s.nachschub) return false;
+  // Im Einrichtungsmodus sieht niemand die Botschaften — sie duerfen deshalb
+  // auch nicht als gezeigt gezaehlt werden.
+  if (s.einrichtung) return false;
   return sessionen.nachschubErlaubt();
 }
 

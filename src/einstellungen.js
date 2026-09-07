@@ -7,12 +7,22 @@
 const cfg = require('./config');
 const { abfragen } = require('./db');
 
+// `einrichtung` ist der Modus fuer den Aufbau vor Ort: die Fassade zeigt ihre
+// eigenen Flaechennamen, damit man Slices zuordnen und ausrichten kann. Er
+// greift erst in der Auslieferung von /api/anzeige und haelt den Nachschub an
+// — sonst wuerden echte Botschaften als "gezeigt" gezaehlt, die niemand sieht.
+//
 // `belegungsplan` ist der Notausstieg fuer den Umbau: aus heisst, der
 // Scheduler entscheidet wieder erst im Moment des Wechsels, so wie vor dem
 // Plan. Die Fassade laeuft dann normal weiter, nur die Ortsangabe auf der
 // Statusseite faellt weg. Wer am Abend Zweifel hat, legt den Schalter um
 // statt einen Redeploy anzustossen.
-const SCHLUESSEL = { autoFreigabe: 'auto_freigabe', nachschub: 'nachschub', belegungsplan: 'belegungsplan' };
+const SCHLUESSEL = {
+  autoFreigabe: 'auto_freigabe',
+  nachschub: 'nachschub',
+  belegungsplan: 'belegungsplan',
+  einrichtung: 'einrichtung'
+};
 const STANDZEIT = 'standzeit';
 const STANDZEIT_MIN = 5;
 const STANDZEIT_MAX = 300;
@@ -21,7 +31,8 @@ function vorgabe () {
   return {
     autoFreigabe: cfg.autoFreigabe, // sauberes FREI direkt in die Anzeige?
     nachschub: true,                // teilt der Scheduler neue Botschaften zu?
-    belegungsplan: true             // wird im Voraus gebucht statt erst beim Wechsel?
+    belegungsplan: true,            // wird im Voraus gebucht statt erst beim Wechsel?
+    einrichtung: false              // zeigt die Fassade ihre eigenen Flaechennamen?
   };
 }
 

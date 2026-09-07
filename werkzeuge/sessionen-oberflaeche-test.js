@@ -207,6 +207,33 @@ async function balkenText (seite) {
     await seite.waitForTimeout(200);
   }
 
+  console.log('\nEinrichtungsmodus: der rote Balken');
+  {
+    await seite.click('nav button[data-ansicht="werkzeuge"]');
+    await seite.waitForTimeout(200);
+    pruefe('kein Balken im Normalbetrieb', await seite.locator('#einrichtungsbalken').isHidden());
+
+    await seite.click('#sEinrichtung');
+    await seite.waitForFunction(() => !document.getElementById('einrichtungsbalken').hidden);
+    pruefe('eingeschaltet faellt er ins Auge',
+      await seite.locator('#einrichtungsbalken').isVisible());
+    const stand = await (await kontext.request.get(BASIS + '/api/moderation/kennzahlen')).json();
+    pruefe('der Server kennt den Modus', stand.schalter.einrichtung === true,
+      JSON.stringify(stand.schalter));
+    const anzeige = await (await kontext.request.get(BASIS + '/api/anzeige')).json();
+    pruefe('und die Fassade zeigt Flaechennamen',
+      anzeige.einrichtung === true && anzeige.flaechen.every(f => /^\d\d /.test(f.text)),
+      JSON.stringify(anzeige.flaechen.slice(0, 2).map(f => f.text)));
+
+    // Der Knopf im Balken selbst muss auch beenden — er ist der, den man sucht.
+    await seite.click('#einrichtungAus');
+    await seite.waitForFunction(() => document.getElementById('einrichtungsbalken').hidden);
+    pruefe('der Knopf im Balken beendet ihn', await seite.locator('#einrichtungsbalken').isHidden());
+
+    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.waitForTimeout(200);
+  }
+
   console.log('\nFehlerhafte Eingabe wird abgefangen');
   {
     await seite.fill('.planzeile input >> nth=0', 'gleich');

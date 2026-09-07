@@ -20,7 +20,7 @@ const fastify = require('fastify')({
   }
 });
 const cfg = require('./config');
-const { FLAECHEN, BANDHOEHE, ortsangabe } = require('./flaechen');
+const { FLAECHEN, BANDHOEHE, ortsangabe, einrichtungName } = require('./flaechen');
 const { abfragen } = require('./db');
 const { groesseFuer, passendeFlaechen } = require('./text');
 const filter = require('./filter');
@@ -178,11 +178,39 @@ function vollerText (b) { return b.name ? `${b.text} — ${b.name}` : b.text; }
 
 // ---------------------------------------------------------------- Anzeige und Flächen
 
-fastify.get('/api/anzeige', async () => ({
-  zeit: Date.now(),
-  blendeSekunden: cfg.blendeSekunden,
-  flaechen: scheduler.anzeige()
-}));
+/**
+ * Was gerade auf der Fassade steht — fuer Simulator und Bridge.
+ *
+ * Der Einrichtungsmodus greift genau hier und nirgends sonst: er ersetzt die
+ * Auslieferung, statt Botschaften anzulegen. Damit taucht keine einzige Zeile
+ * in `botschaften` oder `anzeigen` auf, die Kennzahlen des Abends bleiben
+ * sauber, und beim Ausschalten laeuft es ohne Aufraeumen weiter. Der Nachschub
+ * steht solange still (siehe scheduler.nachladenErlaubt).
+ */
+fastify.get('/api/anzeige', async () => {
+  if (einstellungen.schalter().einrichtung) {
+    return {
+      zeit: Date.now(),
+      blendeSekunden: cfg.blendeSekunden,
+      einrichtung: true,
+      flaechen: FLAECHEN.map(f => {
+        const text = einrichtungName(f);
+        const g = groesseFuer(text, f.breite, cfg.maxVersalhoehe);
+        return {
+          nr: f.nr, name: f.name, breite: f.breite, gruppe: f.gruppe,
+          text, absender: null, hinweis: false, restSekunden: 0,
+          schrifthoehe: g.schrifthoehe, versalhoehe: g.versalhoehe, yVersatz: g.yVersatz
+        };
+      })
+    };
+  }
+  return {
+    zeit: Date.now(),
+    blendeSekunden: cfg.blendeSekunden,
+    einrichtung: false,
+    flaechen: scheduler.anzeige()
+  };
+});
 
 fastify.get('/api/flaechen', async () => FLAECHEN.map(f => ({
   nr: f.nr, name: f.name, breite: f.breite, gruppe: f.gruppe, band: f.band, fassade: f.fassade
@@ -262,10 +290,13 @@ fastify.post('/api/moderation/entscheiden', async (req, reply) => {
 
 fastify.post('/api/moderation/schalter', async (req, reply) => {
   const name = String(req.body?.name ?? '');
-  if (!['autoFreigabe', 'nachschub', 'belegungsplan'].includes(name)) {
+  if (!['autoFreigabe', 'nachschub', 'belegungsplan', 'einrichtung'].includes(name)) {
     return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
   }
   const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
+  // In beide Richtungen: was gebucht war, liegt nach dem Einrichten in der
+  // Vergangenheit. Der Plan baut sich von selbst neu auf.
+  if (name === 'einrichtung') scheduler.planVerwerfen();
   req.log.warn({ name, wert: Boolean(req.body?.wert) }, 'Schalter umgelegt');
   return { schalter: stand };
 });
