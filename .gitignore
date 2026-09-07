@@ -6,3 +6,7 @@ data/
 .env
 .DS_Store
 Thumbs.db
+
+# Die Bridge auf dem Medien-PC: oertliche Einstellungen und Logs bleiben dort.
+bridge/einstellungen.json
+bridge/logs/

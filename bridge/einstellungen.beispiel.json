@@ -1,0 +1,6 @@
+{
+  "server": "https://botschaft.frischvergiftung.de",
+  "arena": "http://127.0.0.1:8080/api/v1",
+  "taktMs": 500,
+  "blendeMs": 350
+}

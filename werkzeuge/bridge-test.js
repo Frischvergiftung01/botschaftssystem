@@ -296,6 +296,30 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
     await einzelne.schliessen();
   }
 
+  console.log('\nDer Ordner bridge/ muss für sich allein lauffähig sein');
+  {
+    // Auf dem Medien-PC liegt nur dieser Ordner — kein Repository, kein
+    // node_modules, kein Netzlaufwerk. Ein versehentliches require auf ein
+    // Paket oder auf src/ wuerde erst dort auffallen, im schlechtesten Fall
+    // am Veranstaltungsabend.
+    const ordner = require('path').join(__dirname, '..', 'bridge');
+    const dateien = fs.readdirSync(ordner).filter(d => d.endsWith('.js'));
+    const fremde = [];
+    for (const d of dateien) {
+      const inhalt = fs.readFileSync(require('path').join(ordner, d), 'utf8');
+      for (const [, was] of inhalt.matchAll(/require\('([^']+)'\)/g)) {
+        if (!['fs', 'path', 'http', 'os'].includes(was) && !was.startsWith('./')) fremde.push(d + ': ' + was);
+      }
+    }
+    pruefe('keine fremden Pakete, nur Node-Bordmittel', fremde.length === 0, fremde.join(', '));
+    pruefe('das Startskript liegt dabei', fs.existsSync(require('path').join(ordner, 'start-bridge.cmd')));
+    pruefe('die Anleitung liegt dabei', fs.existsSync(require('path').join(ordner, 'LIESMICH.md')));
+    const vorlage = JSON.parse(fs.readFileSync(require('path').join(ordner, 'einstellungen.beispiel.json'), 'utf8'));
+    pruefe('die Einstellungsvorlage ist lesbar und vollständig',
+      ['server', 'arena', 'taktMs', 'blendeMs'].every(k => k in vorlage), JSON.stringify(vorlage));
+    pruefe('sie zeigt auf Arena am selben Rechner', /127\.0\.0\.1/.test(vorlage.arena), vorlage.arena);
+  }
+
   await fastify.close();
   console.log(fehler ? `\n${fehler} Fehler\n` : '\nAlles gruen\n');
   process.exit(fehler ? 1 : 0);

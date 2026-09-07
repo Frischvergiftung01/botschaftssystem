@@ -35,7 +35,11 @@ const VORGABE = {
   fehlerBisNeuverbinden: 5,
   // Wie oft nachgesehen wird, ob der beschriebene Clip noch laeuft.
   wachtMs: 15000,
-  ruhig: false
+  ruhig: false,
+  // Wohin mitgeschrieben wird. Leer = nur Fenster. Beim Start ueber
+  // start-bridge.cmd steht hier "logs" — nach dem Abend will man nachsehen
+  // koennen, was wann lief, und niemand liest ein geschlossenes Fenster.
+  logOrdner: ''
 };
 
 /** Einstellungen: Datei neben dieser Datei, darueber Umgebungsvariablen. */
@@ -47,6 +51,7 @@ function einstellungen (zusatz = {}) {
   if (process.env.BRIDGE_ARENA) e.arena = process.env.BRIDGE_ARENA;
   if (process.env.BRIDGE_TAKT_MS) e.taktMs = Number(process.env.BRIDGE_TAKT_MS);
   if (process.env.BRIDGE_BLENDE_MS) e.blendeMs = Number(process.env.BRIDGE_BLENDE_MS);
+  if (process.env.BRIDGE_LOG) e.logOrdner = process.env.BRIDGE_LOG;
   return { ...e, ...zusatz };
 }
 
@@ -55,7 +60,19 @@ const uhr = () => new Date().toLocaleTimeString('de-DE');
 
 function starten (zusatz = {}) {
   const e = einstellungen(zusatz);
-  const sagen = (...w) => { if (!e.ruhig) console.log('[' + uhr() + ']', ...w); };
+
+  /** Eine Zeile ins Fenster und, wenn gewuenscht, in die Tagesdatei. */
+  const sagen = (...w) => {
+    const zeile = '[' + uhr() + '] ' + w.join(' ');
+    if (!e.ruhig) console.log(zeile);
+    if (!e.logOrdner) return;
+    try {
+      const tag = new Date().toISOString().slice(0, 10);
+      const ordner = path.isAbsolute(e.logOrdner) ? e.logOrdner : path.join(__dirname, e.logOrdner);
+      fs.mkdirSync(ordner, { recursive: true });
+      fs.appendFileSync(path.join(ordner, `bridge-${tag}.log`), zeile + '\n');
+    } catch { /* ein volles Laufwerk darf die Fassade nicht anhalten */ }
+  };
 
   // Was steht laut Bridge gerade auf welcher Flaeche?
   const flaechen = new Map(); // nr -> { gezeigt, ziel, laeuft }
@@ -248,7 +265,8 @@ function starten (zusatz = {}) {
 }
 
 if (require.main === module) {
-  const lauf = starten();
+  // Von Hand oder per start-bridge.cmd gestartet: dann wird mitgeschrieben.
+  const lauf = starten({ logOrdner: process.env.BRIDGE_LOG || 'logs' });
   console.log('Bridge läuft. Server: ' + lauf.einstellungen.server + ' · Arena: ' + lauf.einstellungen.arena);
   for (const zeichen of ['SIGINT', 'SIGTERM']) {
     process.on(zeichen, async () => { await lauf.stoppen(); process.exit(0); });
