@@ -33,6 +33,8 @@ const VORGABE = {
   // Nach so vielen Fehlern am Stueck werden die Parameter-IDs neu gelesen:
   // Arena vergibt sie beim Neuladen des Effekts neu.
   fehlerBisNeuverbinden: 5,
+  // Wie oft nachgesehen wird, ob der beschriebene Clip noch laeuft.
+  wachtMs: 15000,
   ruhig: false
 };
 
@@ -62,15 +64,48 @@ function starten (zusatz = {}) {
     return flaechen.get(nr);
   };
 
-  let verbindung = null;      // { pfad, flaechen }
+  let verbindung = null;      // { pfad, flaechen, layer, spalte, ... }
+  let letzteWacht = 0;
   let laeuft = true;
   let arenaFehler = 0;
   const zahlen = { wechsel: 0, serverFehler: 0, arenaFehler: 0, letzteAntwortMs: 0 };
 
   async function verbinden () {
     verbindung = await arena.verbinden(e.arena);
-    sagen(`Arena verbunden — ${verbindung.flaechen.size} Flächen, Weg /${verbindung.pfad}/`);
+    sagen(`Arena verbunden — Layer ${verbindung.layer} „${verbindung.layerName}", Spalte `
+      + `${verbindung.spalte} „${verbindung.clipName}", ${verbindung.flaechen.size} Flächen, `
+      + `Weg /${verbindung.pfad}/`);
+    if (!verbindung.verbunden) {
+      sagen('ACHTUNG: dieser Clip läuft nicht — es wird geschrieben, aber nichts zu sehen sein. '
+        + 'In Arena den Clip mit dem Patch triggern.');
+    }
+    if (verbindung.instanzen > 1) {
+      sagen(`Hinweis: der Patch liegt ${verbindung.instanzen}× in der Komposition — `
+        + 'geschrieben wird in den laufenden Clip.');
+    }
+    letzteWacht = Date.now();
     arenaFehler = 0;
+  }
+
+  /**
+   * Waechter: laeuft der Clip noch, in den wir schreiben?
+   *
+   * Am 07.09.2026 hat genau das eine Stunde gekostet — die Bridge schrieb
+   * fehlerfrei in eine von drei Instanzen des Patches, und zwar in die
+   * falsche. Ein Fehler meldet sich hier nicht von selbst: alle Aufrufe
+   * gelingen, die Wand steht still. Deshalb wird regelmaessig nachgesehen.
+   */
+  async function wachen () {
+    if (!verbindung || Date.now() - letzteWacht < e.wachtMs) return;
+    letzteWacht = Date.now();
+    let laeuftNoch = true;
+    try {
+      laeuftNoch = await arena.nochVerbunden(e.arena, verbindung.layer, verbindung.spalte);
+    } catch { return; }                      // Netzhaenger sind Sache des Taktes
+    if (laeuftNoch) return;
+    sagen('Der Clip mit dem Patch läuft nicht mehr — es wird neu gesucht');
+    verbindung = null;
+    for (const z of flaechen.values()) z.gezeigt = null;
   }
 
   async function setzen (id, wert) {
@@ -150,6 +185,8 @@ function starten (zusatz = {}) {
     if (!verbindung) {
       try { await verbinden(); } catch (fehler) { sagen('Arena: ' + fehler.message); return; }
     }
+    await wachen();
+    if (!verbindung) return;                 // der Waechter hat sie verworfen
     const daten = await anzeigeHolen();
     if (!daten) return;
     if (zahlen.serverFehler && zahlen.letzteAntwortMs) {

@@ -49,29 +49,47 @@ const schlaf = ms => new Promise(r => setTimeout(r, ms));
 // — damit laesst sich die Pfadprobe der Bridge nachstellen.
 
 function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) {
-  const zustand = { weg, idVersatz, ereignisse: [], kompositionAbrufe: 0 };
+  const zustand = {
+    weg,
+    idVersatz,
+    ereignisse: [],
+    kompositionAbrufe: 0,
+    // Welche der beiden Instanzen laeuft gerade? Genau daran ist die Bridge
+    // am 07.09.2026 gescheitert: sie schrieb in eine stillliegende.
+    laeuft: 'neu'
+  };
+
+  const felder = (textBasis, blendeBasis) => Object.fromEntries([
+    ...FLAECHEN.map(f => [
+      String(f.nr).padStart(2, '0') + ' ' + f.name,
+      { id: textBasis + zustand.idVersatz + f.nr, value: '' }
+    ]),
+    ...FLAECHEN.map(f => [
+      'Blende ' + String(f.nr).padStart(2, '0'),
+      { id: blendeBasis + zustand.idVersatz + f.nr, value: 1 }
+    ]),
+    ['Schrifthoehe max', { id: 7001, value: 40 }],
+    ['Opacity', { id: 7002, value: 1 }]
+  ]);
+
+  const clip = (name, felderSatz, verbunden) => ({
+    name: { value: name },
+    connected: { value: verbunden ? 'Connected & previewing' : 'Disconnected' },
+    video: { effects: [{ name: { value: name }, params: felderSatz }] }
+  });
 
   const komposition = () => ({
     name: { value: 'Königsbau_2026' },
-    // Ein bisschen Beiwerk, damit die Suche etwas zu unterscheiden hat.
     master: { id: 1, value: 1 },
     layers: [
-      { name: { value: 'MESSAGES' },
-        clips: [ { video: { effects: [
-          { name: { value: 'FVG Message Wall v2' },
-            params: Object.fromEntries([
-              ...FLAECHEN.map(f => [
-                String(f.nr).padStart(2, '0') + ' ' + f.name,
-                { id: 5000 + zustand.idVersatz + f.nr, value: '' }
-              ]),
-              ...FLAECHEN.map(f => [
-                'Blende ' + String(f.nr).padStart(2, '0'),
-                { id: 6000 + zustand.idVersatz + f.nr, value: 1 }
-              ]),
-              ['Schrifthoehe max', { id: 7001, value: 40 }],
-              ['Opacity', { id: 7002, value: 1 }]
-            ]) }
-        ] } } ] }
+      // Eine aeltere Fassung, die in einer unbenutzten Spalte liegen geblieben ist.
+      { name: { value: 'Shows' },
+        clips: [
+          clip('FVG Message Wall', felder(8000, 9000), zustand.laeuft === 'alt'),
+          clip('FVG Message Wall v2', felder(5000, 6000), zustand.laeuft === 'neu')
+        ],
+        // Arena liefert den laufenden Clip zusaetzlich als Zweitschrift.
+        active_clip: clip('FVG Message Wall v2', felder(5000, 6000), true) }
     ]
   });
 
@@ -82,11 +100,22 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) 
       antwort.writeHead(200, { 'content-type': 'application/json' });
       return antwort.end(JSON.stringify(komposition()));
     }
+    // Der Waechter fragt einen einzelnen Clip ab.
+    const wache = /^composition\/layers\/1\/clips\/(\d)$/.exec(url);
+    if (wache) {
+      const laeuft = (wache[1] === '1' && zustand.laeuft === 'alt') ||
+                     (wache[1] === '2' && zustand.laeuft === 'neu');
+      antwort.writeHead(200, { 'content-type': 'application/json' });
+      return antwort.end(JSON.stringify({
+        connected: { value: laeuft ? 'Connected & previewing' : 'Disconnected' }
+      }));
+    }
     const treffer = new RegExp('^' + zustand.weg + '/(\\d+)$').exec(url);
     if (!treffer) { antwort.writeHead(404); return antwort.end(); }
     const id = Number(treffer[1]);
     // Nach einem Neuladen des Effekts gibt es die alten IDs nicht mehr.
-    const bekannt = (id > 6000 ? id - 6000 : id - 5000) - zustand.idVersatz;
+    const rest = id % 1000;
+    const bekannt = rest - zustand.idVersatz;
     if (bekannt < 1 || bekannt > FLAECHEN.length) { antwort.writeHead(404); return antwort.end(); }
     if (anfrage.method === 'GET') {
       antwort.writeHead(200, { 'content-type': 'application/json' });
@@ -126,7 +155,9 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
   const arenaPort = await arena.starten();
   const lauf = bridge.starten({
     server: BASIS, arena: `http://127.0.0.1:${arenaPort}/api/v1`,
-    taktMs: 200, blendeMs: 350, ruhig: true
+    // Der Waechter sieht im Betrieb alle 15 s nach; hier soll der Test nicht
+    // so lange warten muessen.
+    taktMs: 200, blendeMs: 350, wachtMs: 800, ruhig: true
   });
   await schlaf(1500);
   {
@@ -143,6 +174,9 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
       arena.ereignisse.filter(e => e.id > 5000 && e.id < 6000 && e.wert === '').length);
     pruefe('die Komposition wurde genau einmal gelesen', arena.kompositionAbrufe === 1,
       arena.kompositionAbrufe);
+    pruefe('die stillliegende zweite Instanz bleibt unberührt',
+      !arena.ereignisse.some(e => e.id >= 8000),
+      JSON.stringify(arena.ereignisse.filter(e => e.id >= 8000).slice(0, 3)));
   }
 
   console.log('\nEin Wechsel: aus, warten, Text, ein');
@@ -184,6 +218,21 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
       tot.zahlen.serverFehler);
     pruefe('und schreibt nichts nach Arena', tot.zahlen.wechsel === 0);
     await tot.stoppen();
+  }
+
+  console.log('\nIn Arena wird eine andere Spalte getriggert');
+  {
+    const vorher = arena.ereignisse.length;
+    arena.laeuft = 'alt';                    // jemand triggert den alten Clip
+    await schlaf(3000);
+    const neu = arena.ereignisse.slice(vorher);
+    pruefe('die Bridge merkt es und schreibt in den nun laufenden Clip',
+      neu.some(e => e.id >= 8000), JSON.stringify(neu.slice(0, 3)));
+    arena.laeuft = 'neu';
+    await schlaf(3000);
+    const zurueck = arena.ereignisse.slice(arena.ereignisse.length - 20);
+    pruefe('und wieder zurück, wenn wieder umgeschaltet wird',
+      zurueck.some(e => e.id < 8000), JSON.stringify(zurueck.slice(0, 3)));
   }
 
   console.log('\nArena neu geladen: neue IDs, alte laufen ins Leere');

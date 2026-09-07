@@ -11,6 +11,11 @@
 //    "Blende 33" — die fuehrende Zahl ist die Flaechennummer. Wer im Patch ein
 //    Feld umbenennt oder verschiebt, muss hier nichts nachtragen; wer die
 //    Nummer entfernt, merkt es beim Start sofort.
+//    ABER: gesucht wird nur im LAUFENDEN Clip. In einer gewachsenen
+//    Komposition liegt derselbe Effekt mehrfach herum — am 07.09.2026 waren es
+//    drei Instanzen, und die Bridge schrieb tadellos in eine, die niemand
+//    sieht. Ein Clip, der nicht "Connected" ist, wird nicht gerendert; er
+//    kommt deshalb nur in Frage, wenn gar kein laufender zu finden ist.
 // 2. Der Pfad zur Parameterschnittstelle wird beim Start PROBIERT. Arena hat
 //    ihn zwischen Fassungen schon einmal verschoben; zwei Anfragen beim Start
 //    sind billiger als eine Bridge, die am Veranstaltungsabend an einem
@@ -38,14 +43,17 @@ async function anfrage (url, opt = {}) {
  * Name ist der Schluessel, unter dem es haengt. Das haelt auch dann noch,
  * wenn Arena die Verschachtelung aendert.
  */
-function sammeln (knoten, treffer = []) {
+function sammeln (knoten, treffer = [], lage = {}) {
   if (!knoten || typeof knoten !== 'object') return treffer;
   if (Array.isArray(knoten)) {
-    for (const k of knoten) sammeln(k, treffer);
+    for (const k of knoten) sammeln(k, treffer, lage);
     return treffer;
   }
-  const hier = { text: new Map(), blende: new Map() };
+  const hier = { text: new Map(), blende: new Map(), ...lage };
   for (const [name, wert] of Object.entries(knoten)) {
+    // `active_clip` ist eine Zweitschrift des laufenden Clips — sonst faende
+    // man dieselben Parameter zweimal.
+    if (name === 'active_clip') continue;
     if (wert && typeof wert === 'object' && !Array.isArray(wert) &&
         typeof wert.id === 'number' && 'value' in wert) {
       const blende = /^Blende[ _]?(\d{1,2})$/i.exec(name);
@@ -53,11 +61,32 @@ function sammeln (knoten, treffer = []) {
       if (blende) hier.blende.set(Number(blende[1]), wert.id);
       else if (text) hier.text.set(Number(text[1]), wert.id);
     }
-    sammeln(wert, treffer);
+    // Lage mitfuehren, damit hinterher gesagt werden kann, WO gefunden wurde.
+    if (name === 'layers' && Array.isArray(wert)) {
+      wert.forEach((l, i) => sammeln(l, treffer, { ...lage, layer: i + 1, layerName: l?.name?.value }));
+      continue;
+    }
+    if (name === 'clips' && Array.isArray(wert)) {
+      wert.forEach((c, i) => sammeln(c, treffer, {
+        ...lage,
+        spalte: i + 1,
+        clipName: c?.name?.value,
+        verbunden: /^Connected/i.test(String(c?.connected?.value || ''))
+      }));
+      continue;
+    }
+    sammeln(wert, treffer, lage);
   }
   // Nur wo beides zusammen haengt, ist es unser Effekt.
   if (hier.text.size && hier.blende.size) treffer.push(hier);
   return treffer;
+}
+
+/** Vollstaendige Paare Text+Blende — daran wird gemessen, welche Instanz taugt. */
+function paare (t) {
+  let n = 0;
+  for (const nr of t.text.keys()) if (t.blende.has(nr)) n++;
+  return n;
 }
 
 /**
@@ -70,16 +99,15 @@ async function verbinden (arenaBasis) {
   const treffer = sammeln(await antwort.json());
   if (!treffer.length) {
     throw new Error('In der Komposition steckt kein Effekt mit Text- UND Blendenfeldern. '
-      + 'Liegt "FVG Message Wall v2" auf dem Clip?');
+      + 'Liegt "FVG Message Wall v2" auf einem Clip?');
   }
-  // Der Effekt mit den meisten vollstaendigen Paaren gewinnt — falls eine alte
-  // Fassung des Patches noch irgendwo mitlaeuft.
-  let bester = null, meiste = -1;
-  for (const t of treffer) {
-    let n = 0;
-    for (const nr of t.text.keys()) if (t.blende.has(nr)) n++;
-    if (n > meiste) { meiste = n; bester = t; }
-  }
+  // Erst die laufenden Clips, und darunter der Effekt mit den meisten
+  // vollstaendigen Paaren. Nur wenn gar keiner laeuft, wird der beste
+  // stillliegende genommen — dann stimmt zwar das Schreiben, aber es ist
+  // nichts zu sehen, und genau das sagt `verbunden: false` dem Aufrufer.
+  const laufende = treffer.filter(t => t.verbunden);
+  const bester = (laufende.length ? laufende : treffer)
+    .sort((a, b) => paare(b) - paare(a))[0];
   const flaechen = new Map();
   for (const [nr, text] of bester.text) {
     if (bester.blende.has(nr)) flaechen.set(nr, { text, blende: bester.blende.get(nr) });
@@ -96,7 +124,31 @@ async function verbinden (arenaBasis) {
   }
   if (!pfad) throw new Error('Kein gangbarer Weg zu den Parametern (probiert: ' + PFADE.join(', ') + ')');
 
-  return { pfad, flaechen };
+  return {
+    pfad,
+    flaechen,
+    layer: bester.layer,
+    spalte: bester.spalte,
+    clipName: bester.clipName,
+    layerName: bester.layerName,
+    verbunden: !!bester.verbunden,
+    instanzen: treffer.length
+  };
+}
+
+/**
+ * Laeuft der Clip noch, in den geschrieben wird?
+ *
+ * Waehrend des Abends kann jemand in Arena eine andere Spalte triggern; dann
+ * schreibt die Bridge weiter in einen Clip, den niemand sieht. Die Abfrage
+ * kostet rund 20 kB und laeuft deshalb nur alle paar Sekunden.
+ */
+async function nochVerbunden (arenaBasis, layer, spalte) {
+  if (!layer || !spalte) return true;      // ohne Lage nicht pruefbar
+  const antwort = await anfrage(`${arenaBasis}/composition/layers/${layer}/clips/${spalte}`);
+  if (!antwort.ok) return false;
+  const clip = await antwort.json();
+  return /^Connected/i.test(String(clip?.connected?.value || ''));
 }
 
 /** Setzt einen Parameter. Wirft, damit der Aufrufer mitzaehlen kann. */
@@ -109,4 +161,4 @@ async function setzen (arenaBasis, pfad, id, wert) {
   if (!antwort.ok) throw new Error(`Parameter ${id} nicht gesetzt (${antwort.status})`);
 }
 
-module.exports = { verbinden, setzen, sammeln, PFADE };
+module.exports = { verbinden, setzen, sammeln, nochVerbunden, PFADE };
