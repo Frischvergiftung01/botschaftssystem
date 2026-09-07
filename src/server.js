@@ -461,6 +461,9 @@ fastify.get('/impressum', (req, reply) => reply.sendFile('impressum.html'));
 fastify.get('/datenschutz', (req, reply) => reply.sendFile('datenschutz.html'));
 fastify.get('/moderation', (req, reply) => reply.sendFile('moderation.html'));
 fastify.get('/moderation/eingabe', (req, reply) => reply.sendFile('moderation-eingabe.html'));
+// Die Monitoring-Seite fuer den FOH. Liegt unter /moderation, damit sie
+// dieselbe Anmeldung erbt — die Zahlen des Abends gehen niemanden sonst an.
+fastify.get('/moderation/monitor', (req, reply) => reply.sendFile('monitor.html'));
 fastify.get('/moderation/anmelden', (req, reply) => {
   if (auth.angemeldet(req)) return reply.redirect('/moderation');
   return reply.sendFile('anmeldung.html');

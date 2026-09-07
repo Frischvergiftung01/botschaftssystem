@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor — Botschaften am Königsbau</title>
+<style>
+  /* Gebaut für den zweiten Bildschirm am FOH: aus zwei Metern lesbar, kein
+     Scrollen, keine Knöpfe. Wer hier etwas verstellen will, geht in die
+     Moderation — auf dieser Seite kann man nichts kaputt machen. */
+  :root{
+    --grund:#0f1319; --feld:#161c26; --rand:#242c3a; --text:#e8ecf3; --leise:#8b97ab;
+    --gut:#5fd08a; --gold:#ffcf6b; --warn:#ff9f45; --schlecht:#ff5b4a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--grund);color:var(--text);
+    font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  header{display:flex;align-items:baseline;gap:18px;padding:14px 22px;border-bottom:1px solid var(--rand)}
+  header .marke{font-weight:650;font-size:1.1rem}
+  header .uhr{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--leise)}
+  header .verbindung{color:var(--leise);font-size:.85rem}
+  header .verbindung.weg{color:var(--schlecht)}
+
+  main{display:grid;gap:14px;padding:14px 22px 22px;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .kachel{background:var(--feld);border:1px solid var(--rand);border-left:6px solid var(--rand);
+    border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-height:170px}
+  .kachel.gut{border-left-color:var(--gut)}
+  .kachel.gold{border-left-color:var(--gold)}
+  .kachel.warn{border-left-color:var(--warn)}
+  .kachel.schlecht{border-left-color:var(--schlecht)}
+  .kachel h2{margin:0;font-size:.85rem;font-weight:650;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--leise)}
+  .wert{font-size:2.6rem;font-weight:680;line-height:1.05;font-variant-numeric:tabular-nums}
+  .kachel.gut .wert{color:var(--gut)}
+  .kachel.gold .wert{color:var(--gold)}
+  .kachel.warn .wert{color:var(--warn)}
+  .kachel.schlecht .wert{color:var(--schlecht)}
+  .dazu{color:var(--text);font-size:1rem}
+  /* Was zu tun ist, wenn die Kachel nicht grün ist. Der eigentliche Zweck der
+     Seite: nicht nur zeigen, dass etwas klemmt, sondern was man dagegen tut. */
+  .rat{margin-top:auto;color:var(--leise);font-size:.85rem;border-top:1px solid var(--rand);padding-top:8px}
+  .kachel:not(.gut) .rat{color:var(--gold)}
+  .schalterliste{display:flex;flex-wrap:wrap;gap:8px}
+  .schalterliste span{border:1px solid var(--rand);border-radius:999px;padding:4px 11px;font-size:.9rem}
+  .schalterliste span.an{border-color:var(--gut);color:var(--gut)}
+  .schalterliste span.aus{border-color:var(--warn);color:var(--warn)}
+  .schalterliste span.achtung{border-color:var(--schlecht);color:var(--schlecht);font-weight:650}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="marke">Königsbau — Monitor</span>
+  <span class="verbindung" id="verbindung">verbunden</span>
+  <span class="uhr" id="uhr">–</span>
+</header>
+
+<main>
+  <section class="kachel" id="kFassade">
+    <h2>Fassade</h2>
+    <div class="wert" id="wFassade">–</div>
+    <div class="dazu" id="dFassade"></div>
+    <div class="rat" id="rFassade"></div>
+  </section>
+
+  <section class="kachel" id="kBridge">
+    <h2>Bridge (Medien-PC)</h2>
+    <div class="wert" id="wBridge">–</div>
+    <div class="dazu" id="dBridge"></div>
+    <div class="rat" id="rBridge"></div>
+  </section>
+
+  <section class="kachel" id="kQueue">
+    <h2>Warteschlange</h2>
+    <div class="wert" id="wQueue">–</div>
+    <div class="dazu" id="dQueue"></div>
+    <div class="rat" id="rQueue"></div>
+  </section>
+
+  <section class="kachel" id="kDurchsatz">
+    <h2>Durchsatz</h2>
+    <div class="wert" id="wDurchsatz">–</div>
+    <div class="dazu" id="dDurchsatz"></div>
+    <div class="rat" id="rDurchsatz"></div>
+  </section>
+
+  <section class="kachel" id="kRunde">
+    <h2>Runde</h2>
+    <div class="wert" id="wRunde">–</div>
+    <div class="dazu" id="dRunde"></div>
+    <div class="rat" id="rRunde"></div>
+  </section>
+
+  <section class="kachel" id="kFilter">
+    <h2>Filter, Stufe 1b</h2>
+    <div class="wert" id="wFilter">–</div>
+    <div class="dazu" id="dFilter"></div>
+    <div class="rat" id="rFilter"></div>
+  </section>
+
+  <section class="kachel" id="kSchalter">
+    <h2>Schalter</h2>
+    <div class="schalterliste" id="wSchalter"></div>
+    <div class="dazu" id="dSchalter"></div>
+    <div class="rat" id="rSchalter"></div>
+  </section>
+</main>
+
+<script>
+const el = id => document.getElementById(id);
+let stand = null;
+let versatz = 0;        // Serveruhr minus eigene Uhr
+let letzteAntwort = 0;
+
+function kachel (id, farbe, wert, dazu, rat) {
+  el('k' + id).className = 'kachel ' + farbe;
+  if (wert !== null) el('w' + id).textContent = wert;
+  el('d' + id).textContent = dazu || '';
+  el('r' + id).textContent = rat || '';
+}
+
+const zeitText = s => s >= 60 ? Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') : s + ' s';
+
+async function holen () {
+  try {
+    const antwort = await fetch('/api/moderation/kennzahlen');
+    if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+    if (!antwort.ok) throw new Error(antwort.status);
+    stand = await antwort.json();
+    versatz = (stand.session && stand.session.zeit ? stand.session.zeit : Date.now()) - Date.now();
+    letzteAntwort = Date.now();
+    el('verbindung').textContent = 'verbunden';
+    el('verbindung').className = 'verbindung';
+  } catch {
+    el('verbindung').textContent = 'keine Verbindung zum Server';
+    el('verbindung').className = 'verbindung weg';
+  }
+  zeichnen();
+}
+
+function zeichnen () {
+  const jetzt = Date.now() + versatz;
+  el('uhr').textContent = new Date(jetzt).toLocaleTimeString('de-DE');
+  if (!stand) return;
+
+  // ---- Fassade
+  {
+    const f = stand.flaechen || { gesamt: 33, belegt: 0, fuellsel: 0, hinweise: 0 };
+    const echte = f.belegt - f.fuellsel - f.hinweise;
+    const anteil = f.gesamt ? f.belegt / f.gesamt : 0;
+    const farbe = f.belegt === 0 ? 'schlecht' : anteil < 0.4 ? 'gold' : 'gut';
+    const teile = [];
+    if (f.fuellsel) teile.push(f.fuellsel + '× Füllsel');
+    if (f.hinweise) teile.push(f.hinweise + '× Hinweis');
+    kachel('Fassade', farbe, f.belegt + ' / ' + f.gesamt,
+      echte + ' Botschaften' + (teile.length ? ' · ' + teile.join(' · ') : ''),
+      f.belegt === 0
+        ? 'Nichts auf der Wand: läuft eine Runde? Ist etwas freigegeben? Sonst Füllsel einschalten.'
+        : 'Belegte Flächen von 33.');
+  }
+
+  // ---- Bridge
+  {
+    const b = stand.bridge || { gemeldet: false };
+    if (!b.gemeldet) {
+      kachel('Bridge', 'schlecht', 'keine',
+        'Es hat sich noch keine Bridge gemeldet.',
+        'Auf dem Medien-PC start-bridge.cmd starten.');
+    } else if (!b.frisch) {
+      kachel('Bridge', 'schlecht', 'still',
+        'Letzter Puls vor ' + zeitText(b.vorSekunden) + '.',
+        'Fenster der Bridge auf dem Medien-PC ansehen — läuft sie noch? Netz?');
+    } else {
+      const s = b.stand || {};
+      kachel('Bridge', s.clipLaeuft === false ? 'gold' : 'gut',
+        s.clipLaeuft === false ? 'Clip aus' : 'läuft',
+        (s.wechsel || 0) + ' Wechsel · ' + (s.arenaFehler || 0) + ' Arena-Fehler'
+        + (s.layer ? ' · Layer ' + s.layer + ', Spalte ' + s.spalte : ''),
+        s.clipLaeuft === false
+          ? 'Die Bridge schreibt, aber der Clip in Arena ist nicht getriggert — während der Show normal.'
+          : 'Puls kommt, Arena antwortet.');
+    }
+  }
+
+  // ---- Warteschlange
+  {
+    const offen = stand.offenGesamt || 0;
+    const unsicher = (stand.offen && stand.offen.unsicher) || 0;
+    const farbe = offen >= 80 ? 'schlecht' : offen >= 30 ? 'gold' : 'gut';
+    kachel('Queue', farbe, String(offen),
+      unsicher + ' davon unsicher (Einzelprüfung)',
+      offen >= 80
+        ? 'Es staut sich: Rasteransicht mit Sammelfreigabe, oder zweite Person an die Moderation.'
+        : 'Wartende Botschaften.');
+  }
+
+  // ---- Durchsatz
+  {
+    const proStunde = stand.durchsatzProStunde || 0;
+    const farbe = (stand.offenGesamt || 0) >= 30 && proStunde < 200 ? 'gold' : 'gut';
+    kachel('Durchsatz', farbe, proStunde + '/h',
+      (stand.entschieden5Min || 0) + ' Entscheidungen in 5 min · '
+      + (stand.entschiedenStunde || 0) + ' in der letzten Stunde',
+      farbe === 'gut'
+        ? 'Hochgerechnet aus den letzten fünf Minuten.'
+        : 'Es liegt etwas an, aber es wird wenig entschieden — jemand an der Moderation?');
+  }
+
+  // ---- Runde
+  {
+    const s = stand.session || { phase: 'ohnePlan' };
+    if (s.phase === 'ohnePlan') {
+      kachel('Runde', 'gold', 'kein Plan',
+        'Keine Spielzeiten eingetragen — die Fassade läuft durch.',
+        'Für den Veranstaltungsabend die Runden im Reiter Spielzeiten eintragen.');
+    } else if (s.aktuell) {
+      const restNachschub = Math.max(0, Math.round((s.aktuell.nachschubBis - jetzt) / 1000));
+      const restEnde = Math.max(0, Math.round((s.aktuell.ende - jetzt) / 1000));
+      kachel('Runde', s.aktuell.phase === 'laeuftAus' ? 'gold' : 'gut',
+        'Runde ' + s.aktuell.nr,
+        s.aktuell.phase === 'laeuftAus'
+          ? 'Läuft aus — Wand leer in ' + zeitText(restEnde)
+          : 'Noch ' + zeitText(restNachschub) + ' Nachschub, leer um ' + s.aktuell.endeUhrzeit,
+        'Ende ist verbindlich: dann ist die Wand leer.');
+    } else if (s.kommend) {
+      const bis = Math.round((s.kommend.startStempel - jetzt) / 1000);
+      kachel('Runde', bis < 0 ? 'schlecht' : 'gut',
+        bis < 0 ? 'überfällig' : 'in ' + zeitText(bis),
+        'Nächste Runde ' + s.kommend.nr + ' um ' + s.kommend.geplantStart,
+        bis < 0
+          ? 'Der geplante Start ist vorbei — in der Moderation auf Starten drücken.'
+          : 'Gestartet wird von Hand, in der Moderation.');
+    } else {
+      kachel('Runde', 'gold', 'Pause', 'Keine weitere Runde geplant.', 'Der Abend ist durch.');
+    }
+  }
+
+  // ---- Filter
+  {
+    const f = stand.stufe1b || { aktiv: false };
+    if (!f.aktiv) {
+      kachel('Filter', 'gold', 'aus',
+        'Stufe 1b ist stillgelegt — es filtert nur die Wortliste.',
+        'Ohne Schlüssel läuft nur Stufe 1a. Am Abend sollte 1b an sein.');
+    } else {
+      const fehler = (f.fehler || 0) + (f.timeout || 0);
+      const farbe = f.ueberlastet ? 'schlecht' : fehler > 20 ? 'gold' : 'gut';
+      kachel('Filter', farbe, (f.msSchnitt === null || f.msSchnitt === undefined ? '–' : f.msSchnitt + ' ms'),
+        (f.aufrufe || 0) + ' Aufrufe · ' + fehler + ' Fehler/Timeouts · '
+        + (f.ueberlastet || 0) + '× überlastet',
+        farbe === 'gut'
+          ? 'Mittlere Antwortzeit des Sprachmodells.'
+          : 'Bei Überlast oder vielen Timeouts geht alles Unklare in die Moderation — Queue im Auge behalten.');
+    }
+  }
+
+  // ---- Schalter
+  {
+    const s = stand.schalter || {};
+    const ziel = el('wSchalter');
+    ziel.innerHTML = '';
+    const zeile = (name, an, achtung) => {
+      const sp = document.createElement('span');
+      sp.className = achtung ? 'achtung' : (an ? 'an' : 'aus');
+      sp.textContent = name + ' ' + (an ? 'an' : 'aus');
+      ziel.appendChild(sp);
+    };
+    zeile('Auto-Freigabe', s.autoFreigabe);
+    zeile('Nachschub', s.nachschub !== false, s.nachschub === false);
+    zeile('Belegungsplan', s.belegungsplan !== false);
+    zeile('Einrichtungsmodus', s.einrichtung === true, s.einrichtung === true);
+    const auffaellig = s.nachschub === false || s.einrichtung === true;
+    el('kSchalter').className = 'kachel ' + (auffaellig ? 'schlecht' : 'gut');
+    el('dSchalter').textContent = 'Standzeit ' + (stand.standzeitSekunden || '?') + ' s · '
+      + ((stand.fuellsel && stand.fuellsel.aktive) || 0) + ' Füllsel aktiv · '
+      + (stand.hinweiseScharf || 0) + ' Hinweise scharf';
+    el('rSchalter').textContent = s.einrichtung === true
+      ? 'Einrichtungsmodus läuft — die Fassade zeigt Flächennamen, keine Botschaften.'
+      : s.nachschub === false
+        ? 'Nachschub ist angehalten — es kommt nichts Neues an die Wand.'
+        : 'Alles im Normalbetrieb.';
+  }
+}
+
+holen();
+setInterval(holen, 2000);
+setInterval(zeichnen, 1000);   // Countdowns laufen zwischen den Abfragen weiter
+</script>
+</body>
+</html>
