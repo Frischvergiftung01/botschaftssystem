@@ -210,6 +210,44 @@ async function balkenText (seite) {
     await seite.waitForTimeout(200);
   }
 
+  console.log('\nFuellsel: Plaetze bearbeiten und schalten');
+  {
+    await seite.click('nav button[data-ansicht="fuellsel"]');
+    await seite.waitForTimeout(300);
+    pruefe('der Reiter geht auf', await seite.locator('#fuellsel').isVisible());
+    const karten = await seite.locator('#fuellselListe .fuellsel-karte').count();
+    pruefe('Vorschlaege stehen bereit', karten > 0, karten);
+    pruefe('der Deckel steht in der Erklaerung',
+      (await seite.locator('#fuellselDeckel').textContent()) === '11',
+      await seite.locator('#fuellselDeckel').textContent());
+    pruefe('noch ist keiner aktiv',
+      (await seite.locator('#fuellselListe .fuellsel-karte.an').count()) === 0);
+
+    await seite.click('#fuellselListe .fuellsel-karte >> nth=0 >> button');
+    await seite.waitForFunction(() => /Aktiv/.test(document.getElementById('fuellselStand').textContent));
+    pruefe('einschalten wirkt',
+      (await seite.locator('#fuellselListe .fuellsel-karte.an').count()) === 1);
+    const k = await (await kontext.request.get(BASIS + '/api/moderation/kennzahlen')).json();
+    pruefe('die Kennzahlen zaehlen den aktiven Platz', k.fuellsel.aktive === 1,
+      JSON.stringify(k.fuellsel));
+
+    // Text aendern und speichern.
+    await seite.fill('#fuellselListe .fuellsel-karte >> nth=0 >> textarea', 'Willkommen am Königsbau');
+    await seite.click('#fuellselSpeichern');
+    await seite.waitForFunction(() => /Plätze gespeichert/.test(document.getElementById('fuellselStand').textContent));
+    pruefe('speichern meldet die Zahl der Plaetze',
+      /Plätze gespeichert/.test(await seite.locator('#fuellselStand').textContent()),
+      await seite.locator('#fuellselStand').textContent());
+    pruefe('und die Passung wird gemessen',
+      /passt auf/.test(await seite.locator('#fuellselListe .fuellsel-karte >> nth=0').textContent()),
+      await seite.locator('#fuellselListe .fuellsel-karte >> nth=0').textContent());
+
+    await seite.click('#fuellselListe .fuellsel-karte >> nth=0 >> button');
+    await seite.waitForFunction(() => /Ausgeschaltet/.test(document.getElementById('fuellselStand').textContent));
+    pruefe('und ausschalten auch',
+      (await seite.locator('#fuellselListe .fuellsel-karte.an').count()) === 0);
+  }
+
   console.log('\nEinrichtungsmodus: der rote Balken');
   {
     await seite.click('nav button[data-ansicht="werkzeuge"]');

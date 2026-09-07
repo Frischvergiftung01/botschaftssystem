@@ -84,17 +84,17 @@
 
   /* Hinweise vom Platz. Ein scharfer Platz belegt die Stirnseite Mitte —
      das muss man auf einen Blick sehen, auch von der anderen Seite des Raums. */
-  .hinweis-karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;
+  .hinweis-karte,.fuellsel-karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;
     padding:12px;margin-bottom:12px}
-  .hinweis-karte.an{border-color:var(--gut);box-shadow:0 0 0 2px rgba(95,208,138,.22)}
-  .hinweis-karte .kopfzeile{margin-bottom:8px}
-  .hinweis-karte .kopfzeile .an{color:var(--gut);font-weight:650}
-  .hinweis-karte textarea{width:100%;background:var(--grund);color:var(--text);
+  .hinweis-karte.an,.fuellsel-karte.an{border-color:var(--gut);box-shadow:0 0 0 2px rgba(95,208,138,.22)}
+  .hinweis-karte .kopfzeile,.fuellsel-karte .kopfzeile{margin-bottom:8px}
+  .hinweis-karte .kopfzeile .an,.fuellsel-karte .kopfzeile .an{color:var(--gut);font-weight:650}
+  .hinweis-karte textarea,.fuellsel-karte textarea{width:100%;background:var(--grund);color:var(--text);
     border:1px solid var(--rand);border-radius:10px;padding:10px 12px;font:inherit;
     resize:vertical;min-height:2.6rem}
-  .hinweis-karte textarea.offen{border-color:var(--gold)}
+  .hinweis-karte textarea.offen,.fuellsel-karte textarea.offen{border-color:var(--gold)}
   .hinweis-karte .buehne{margin-top:10px}
-  .hinweis-zeile{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+  .hinweis-zeile,.fuellsel-zeile{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
   .hinweis-zeile .warnung{color:var(--unsicher);font-size:.8rem}
   .zahlen .hinweise b{color:var(--gut)}
 
@@ -222,6 +222,7 @@
   <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
   <button data-ansicht="spielzeiten">Spielzeiten</button>
   <button data-ansicht="hinweise">Hinweise</button>
+  <button data-ansicht="fuellsel">Füllsel</button>
   <button data-ansicht="werkzeuge">Werkzeuge</button>
 </nav>
 
@@ -308,6 +309,27 @@
       <button class="pille" id="hinweisSpeichern"
         style="background:var(--gut);color:#04240f;border:0;font-weight:650">Texte speichern</button>
       <span class="fuss" id="hinweisStand"></span>
+    </div>
+  </section>
+
+  <section id="fuellsel" hidden>
+    <div class="karte">
+      <h2>Füllsel</h2>
+      <p class="fuss">Eigene Texte, die <b>Lücken schließen</b>. Am Anfang des Abends ist noch nichts
+      eingegangen, und auf die schmalen Säulen passt manche lange Botschaft nicht lesbar — ohne
+      Füllsel bliebe die Fläche dunkel.<br>
+      Ein Füllsel <b>verdrängt nie eine Botschaft</b>. Es kommt nur dorthin, wo sonst nichts stünde,
+      und höchstens auf <b id="fuellselDeckel">11</b> Flächen gleichzeitig — eine halb dunkle Wand
+      sieht aus, als warte sie auf Botschaften, eine volle sieht aus wie eine Werbetafel.<br>
+      Füllsel gehen durch keinen Filter, tauchen in keiner Queue auf und werden <b>nicht</b> in den
+      Kennzahlen des Abends gezählt. Am Ende soll dastehen, was wirklich aus dem Publikum kam.</p>
+    </div>
+    <div id="fuellselListe" style="margin-top:14px"></div>
+    <div class="werkzeug">
+      <button class="pille" id="fuellselDazu">Platz hinzufügen</button>
+      <button class="pille" id="fuellselSpeichern"
+        style="background:var(--gut);color:#04240f;border:0;font-weight:650">Texte speichern</button>
+      <span class="fuss" id="fuellselStand"></span>
     </div>
   </section>
 
@@ -448,6 +470,11 @@ async function start () {
     hinweiseZeichnen(); hinweisOffen();
   });
   el('hinweisSpeichern').addEventListener('click', () => hinweiseSpeichern(true));
+  el('fuellselDazu').addEventListener('click', () => {
+    fuellselZeilen.push({ nr: fuellselZeilen.length + 1, text: '', aktiv: false, anzahlAnzeigen: 0, passendeFlaechen: 0 });
+    fuellselZeichnen(); fuellselOffen();
+  });
+  el('fuellselSpeichern').addEventListener('click', fuellselSpeichern);
   // Der Balken zaehlt selbst herunter, statt sekuendlich zu fragen.
   setInterval(spielbalkenZeichnen, 1000);
   document.addEventListener('keydown', taste);
@@ -466,7 +493,7 @@ async function start () {
 // ---------------------------------------------------------------- Daten
 
 async function laden (frisch) {
-  if (['werkzeuge', 'spielzeiten', 'hinweise'].includes(ansicht)) { zeichnen(); return; }
+  if (['werkzeuge', 'spielzeiten', 'hinweise', 'fuellsel'].includes(ansicht)) { zeichnen(); return; }
   if (ansicht === 'uebersicht') {
     const [r1, r2] = await Promise.all([
       fetch('/api/moderation/queue?ansicht=einzeln&grenze=60'),
@@ -600,9 +627,11 @@ function wechseln (neu) {
   el('werkzeuge').hidden = neu !== 'werkzeuge';
   el('spielzeiten').hidden = neu !== 'spielzeiten';
   el('hinweise').hidden = neu !== 'hinweise';
+  el('fuellsel').hidden = neu !== 'fuellsel';
   document.querySelector('main').classList.toggle('uebersicht', haupt);
   if (neu === 'spielzeiten') planHolen();
   if (neu === 'hinweise') hinweiseHolen();
+  if (neu === 'fuellsel') fuellselHolen();
   laden(true);
 }
 
@@ -610,7 +639,7 @@ function zeichnen () {
   if (ansicht === 'uebersicht') { zeichnenEinzeln(); zeichnenRaster(); }
   else if (ansicht === 'einzeln') zeichnenEinzeln();
   else if (ansicht === 'raster') zeichnenRaster();
-  else if (!['werkzeuge', 'spielzeiten', 'hinweise'].includes(ansicht)) zeichnenListe();
+  else if (!['werkzeuge', 'spielzeiten', 'hinweise', 'fuellsel'].includes(ansicht)) zeichnenListe();
 }
 
 function buehneBauen () {
@@ -1122,6 +1151,140 @@ function zeitenErzeugen () {
   planZeichnen();
   planOffen(erzeugt.length + ' Zeilen erzeugt — noch nicht gespeichert.'
     + (abgeschnitten ? ' Die späteren lägen nach Mitternacht und wurden weggelassen.' : ''));
+}
+
+// ---------------------------------------------------------------- Fuellsel
+//
+// Eigene Texte fuer die Luecken. Bewusst schlichter als die Hinweise: keine
+// Projektionsvorschau, dafuer die Zahl, auf wie viele der 33 Flaechen ein Text
+// lesbar passt — genau daran entscheidet sich, ob er die schmalen Saeulen
+// fuellen kann oder nur die Stirnseiten.
+
+let fuellselZeilen = [];
+let fuellselDaten = null;
+let fuellselGeaendert = false;
+
+async function fuellselHolen () {
+  const antwort = await fetch('/api/moderation/fuellsel');
+  if (antwort.status === 401) { location.href = '/moderation/anmelden'; return; }
+  fuellselUebernehmen(await antwort.json());
+  fuellselZu('');
+}
+
+function fuellselUebernehmen (d) {
+  fuellselDaten = d;
+  fuellselZeilen = d.zeilen.map(z => ({ ...z }));
+  el('fuellselDeckel').textContent = d.deckel;
+  fuellselZeichnen();
+}
+
+function fuellselOffen (text) {
+  fuellselGeaendert = true;
+  el('fuellselSpeichern').classList.add('offen');
+  el('fuellselStand').className = 'fuss ungespeichert';
+  el('fuellselStand').textContent = text || 'Geändert — noch nicht gespeichert.';
+}
+
+function fuellselZu (text) {
+  fuellselGeaendert = false;
+  el('fuellselSpeichern').classList.remove('offen');
+  el('fuellselStand').className = 'fuss';
+  el('fuellselStand').textContent = text || '';
+}
+
+function fuellselZeichnen () {
+  const ziel = el('fuellselListe');
+  ziel.innerHTML = '';
+  fuellselZeilen.forEach((z, i) => {
+    const karte = document.createElement('div');
+    // Eigene Klasse, nicht die der Hinweise: `.hinweis-karte textarea` traefe
+    // sonst die Fuellsel mit, sobald deren Reiter zuerst gezeichnet wurde.
+    karte.className = 'fuellsel-karte' + (z.aktiv ? ' an' : '');
+
+    const kopf = document.createElement('div');
+    kopf.className = 'kopfzeile';
+    const platz = document.createElement('span');
+    platz.textContent = 'Platz ' + (i + 1);
+    kopf.appendChild(platz);
+    if (z.aktiv) {
+      const an = document.createElement('span');
+      an.className = 'an';
+      an.textContent = 'aktiv';
+      kopf.appendChild(an);
+    }
+    if (z.anzahlAnzeigen) {
+      const oft = document.createElement('span');
+      oft.textContent = z.anzahlAnzeigen + '× gezeigt';
+      kopf.appendChild(oft);
+    }
+
+    const feld = document.createElement('textarea');
+    feld.value = z.text;
+    feld.rows = 2;
+    feld.maxLength = (fuellselDaten && fuellselDaten.maxZeichen) || 120;
+    feld.placeholder = 'z. B. Willkommen am Königsbau';
+    feld.setAttribute('aria-label', 'Füllsel für Platz ' + (i + 1));
+
+    const passt = document.createElement('span');
+    passt.className = 'fuss';
+    const passtSetzen = () => {
+      const n = z.text.trim() ? z.passendeFlaechen : 0;
+      passt.textContent = !z.text.trim() ? 'leer'
+        : n === 33 ? 'passt auf alle 33 Flächen'
+          : n === 0 ? 'passt auf keine Fläche lesbar — zu lang'
+            : `passt auf ${n} von 33 Flächen`;
+      passt.style.color = n === 0 && z.text.trim() ? 'var(--unsicher)' : '';
+    };
+    passtSetzen();
+    feld.addEventListener('input', () => {
+      fuellselZeilen[i].text = feld.value;
+      feld.classList.add('offen');
+      // Die genaue Zahl rechnet der Server beim Speichern; bis dahin ist die
+      // alte Angabe hinfaellig und soll nicht so tun, als stimme sie noch.
+      passt.textContent = 'wird beim Speichern gemessen';
+      passt.style.color = '';
+      fuellselOffen();
+    });
+
+    const zeile = document.createElement('div');
+    zeile.className = 'fuellsel-zeile';
+    const schalter = document.createElement('button');
+    schalter.className = z.aktiv ? 'pille aus' : 'pille an';
+    schalter.textContent = z.aktiv ? 'Ausschalten' : 'Aktivieren';
+    schalter.addEventListener('click', () => fuellselSchalten(i, !z.aktiv));
+
+    zeile.appendChild(passt);
+    zeile.appendChild(schalter);
+
+    karte.appendChild(kopf);
+    karte.appendChild(feld);
+    karte.appendChild(zeile);
+    ziel.appendChild(karte);
+  });
+}
+
+async function fuellselSchalten (i, wert) {
+  if (fuellselGeaendert) { fuellselOffen('Erst speichern, dann schalten.'); return; }
+  const antwort = await fetch('/api/moderation/fuellsel-aktiv', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ nr: i + 1, wert })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { fuellselOffen(d.fehler || 'Nicht möglich.'); return; }
+  fuellselUebernehmen(d);
+  fuellselZu(wert ? 'Aktiv — füllt Lücken ab dem nächsten Wechsel.' : 'Ausgeschaltet.');
+  melden(wert ? 'Füllsel aktiv' : 'Füllsel ausgeschaltet');
+}
+
+async function fuellselSpeichern () {
+  const antwort = await fetch('/api/moderation/fuellsel', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ zeilen: fuellselZeilen.map(z => ({ text: z.text, aktiv: z.aktiv })) })
+  });
+  const d = await antwort.json();
+  if (!antwort.ok) { fuellselOffen(d.fehler || 'Nicht gespeichert.'); return; }
+  fuellselUebernehmen(d);
+  fuellselZu(d.zeilen.length + ' Plätze gespeichert.');
 }
 
 // ---------------------------------------------------------------- Hinweise vom Platz

@@ -67,6 +67,14 @@ module.exports = {
   hinweisPlaetze: Number(process.env.HINWEIS_PLAETZE || 5),
   maxZeichenHinweis: Number(process.env.MAX_ZEICHEN_HINWEIS || 120),
 
+  // Fuellsel — eigene Texte, die Luecken schliessen (Block 7).
+  // Der Deckel ist der wichtige Wert: ein Drittel der Flaechen. Am leeren
+  // Anfang wirkt die Fassade damit bespielt, aber nicht wie eine Werbetafel,
+  // und es bleibt sichtbar, dass hier auf Botschaften gewartet wird.
+  fuellselPlaetze: Number(process.env.FUELLSEL_PLAETZE || 8),
+  fuellselDeckel: Number(process.env.FUELLSEL_DECKEL || 11),
+  maxZeichenFuellsel: Number(process.env.MAX_ZEICHEN_FUELLSEL || 120),
+
   // Belegungsplan. Wie weit im Voraus gebucht wird — daraus speist sich die
   // Ortsangabe auf der Statusseite. Zu kurz: der Absender erfaehrt zu spaet,
   // wo er hinlaufen soll. Zu lang: der Plan veraltet schneller, als er

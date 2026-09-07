@@ -63,6 +63,21 @@ CREATE TABLE IF NOT EXISTS hinweise (
   zuletzt_gezeigt INTEGER
 );
 
+-- Fuellsel: eigene Texte, die Luecken schliessen. Am Anfang des Abends ist
+-- noch nichts eingegangen, und auf die schmalen Saeulen passt manche lange
+-- Botschaft nicht lesbar drauf — ohne Fuellsel bliebe die Flaeche dunkel.
+-- Eigene Tabelle aus demselben Grund wie bei den Hinweisen: sie kommen nicht
+-- aus dem Publikum und duerfen die Kennzahlen des Abends nicht faerben.
+CREATE TABLE IF NOT EXISTS fuellsel (
+  id              INTEGER PRIMARY KEY,
+  nr              INTEGER NOT NULL UNIQUE,  -- Platz in der Liste, ab 1
+  text            TEXT    NOT NULL DEFAULT '',
+  -- aktiv heisst: darf eine Luecke fuellen. Nicht: kommt garantiert dran.
+  aktiv           INTEGER NOT NULL DEFAULT 0,
+  anzahl_anzeigen INTEGER NOT NULL DEFAULT 0,
+  zuletzt_gezeigt INTEGER
+);
+
 -- Die Spielzeiten des Abends (Sessions). Minuten seit Mitternacht als Plan,
 -- echte Zeitstempel sobald gestartet wurde. Dass beides in der Datenbank
 -- steht und nicht im Arbeitsspeicher, ist Absicht: eine laufende Session
@@ -139,6 +154,16 @@ const abfragen = {
   hinweisGezeigt: db.prepare(`UPDATE hinweise
                               SET anzahl_anzeigen = anzahl_anzeigen + 1, zuletzt_gezeigt = @zeit
                               WHERE id = @id`),
+
+  // ---- Fuellsel ----------------------------------------------------------
+  fuellselListe: db.prepare('SELECT * FROM fuellsel ORDER BY nr ASC'),
+  fuellselLeeren: db.prepare('DELETE FROM fuellsel'),
+  fuellselEinfuegen: db.prepare(`INSERT INTO fuellsel (nr, text, aktiv, anzahl_anzeigen, zuletzt_gezeigt)
+                                 VALUES (@nr, @text, @aktiv, @anzahl_anzeigen, @zuletzt_gezeigt)`),
+  fuellselAktiv: db.prepare('UPDATE fuellsel SET aktiv = @aktiv WHERE nr = @nr'),
+  fuellselGezeigt: db.prepare(`UPDATE fuellsel
+                               SET anzahl_anzeigen = anzahl_anzeigen + 1, zuletzt_gezeigt = @zeit
+                               WHERE id = @id`),
 
   // ---- Spielzeiten -------------------------------------------------------
   sessionenListe: db.prepare('SELECT * FROM sessionen ORDER BY nr ASC'),

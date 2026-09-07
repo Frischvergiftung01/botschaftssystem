@@ -29,6 +29,7 @@ const { abfragen } = require('./db');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
+const fuellsel = require('./fuellsel');
 const belegungsplan = require('./belegungsplan');
 
 // Laufender Zustand je Fläche — das ist genau das, was Simulator und Bridge lesen.
@@ -41,6 +42,7 @@ for (const [i, f] of FLAECHEN.entries()) {
     gruppe: f.gruppe,
     botschaftId: null,
     hinweisId: null,     // steht statt einer Botschaft ein Hinweis vom Platz hier?
+    fuellselId: null,    // oder ein Fuellsel, weil sonst nichts passte?
     text: '',
     absender: null,
     start: 0,
@@ -163,7 +165,9 @@ function belegen (f, t) {
     if (h) return hinweisSetzen(f, h, t);
   }
   const kandidaten = abfragen.spielbar.all();
-  if (kandidaten.length === 0) return false;
+  // Leerer Vorrat ist der Hauptfall fuers Fuellsel — hier nicht vorzeitig
+  // aussteigen, sonst bleibt genau der Anfang des Abends dunkel.
+  if (kandidaten.length === 0) return fuellselVersuchen(f, t);
 
   const laufendeIds = new Set([...zustand.values()].filter(x => x.nr !== f.nr && x.ende > t).map(x => x.botschaftId));
 
@@ -176,7 +180,50 @@ function belegen (f, t) {
 
     return botschaftSetzen(f, b, t, g, voll);
   }
-  return false;
+  // Nichts Passendes da — statt die Flaeche dunkel zu lassen, ein Fuellsel.
+  return fuellselVersuchen(f, t);
+}
+
+/**
+ * Fuellsel als letzte Stufe, nicht als Mitbewerber.
+ *
+ * Es kommt nur, wenn die Flaeche sonst leer bliebe, und nur solange nicht
+ * schon ein Drittel der Wand aus eigenen Texten besteht. Der Deckel ist der
+ * Punkt: eine Fassade voller eigener Saetze sieht aus wie eine Werbetafel,
+ * eine halb dunkle Wand sieht aus, als warte sie auf Botschaften — und genau
+ * das tut sie.
+ */
+function fuellselVersuchen (f, t) {
+  if (!fuellsel.aktiveVorhanden()) return false;
+  let belegt = 0;
+  const laufende = new Set();
+  for (const x of zustand.values()) {
+    if (x.fuellselId === null || x.ende <= t) continue;
+    if (x.nr !== f.nr) { belegt++; laufende.add(x.fuellselId); }
+  }
+  if (belegt >= cfg.fuellselDeckel) return false;
+  const z = fuellsel.naechsterFuer(f, f.fuellselId, laufende);
+  if (!z) return false;
+  return fuellselSetzen(f, z, t);
+}
+
+/**
+ * Traegt ein Fuellsel ein. Kein Eintrag in `anzeigen`, keine Zaehlung auf
+ * einer Botschaft — gezaehlt wird nur in der eigenen Tabelle, damit die
+ * Kennzahlen des Abends sagen, was wirklich aus dem Publikum kam.
+ */
+function fuellselSetzen (f, z, t) {
+  const ende = t + einstellungen.standzeit() * 1000;
+  f.botschaftId = null;
+  f.hinweisId = null;
+  f.fuellselId = z.id;
+  f.text = z.text;
+  f.absender = null;
+  f.start = t;
+  f.ende = ende;
+  f.groesse = z.groesse;
+  fuellsel.gezeigt(z.id, t);
+  return true;
 }
 
 /** Trägt eine Botschaft auf einer Fläche ein und schreibt sie fort. */
@@ -185,8 +232,9 @@ function botschaftSetzen (f, b, t, g, voll) {
   f.botschaftId = b.id;
   // Zuruecksetzen, sonst gilt die Flaeche nach einem Hinweis weiter als
   // belegt von ihm — und die Anzeige weist eine Publikumsbotschaft als
-  // Durchsage aus.
+  // Durchsage aus. Dasselbe gilt fuer ein vorher gezeigtes Fuellsel.
   f.hinweisId = null;
+  f.fuellselId = null;
   f.text = voll;
   f.absender = b.name || null;
   f.start = t;
@@ -243,6 +291,7 @@ function ausPlanNehmen (f, t) {
 function hinweisSetzen (f, h, t) {
   const g = groesseFuer(h.text, f.breite, cfg.maxVersalhoehe);
   f.botschaftId = null;
+  f.fuellselId = null;
   f.hinweisId = h.id;
   f.text = h.text;
   f.absender = null;          // ein Hinweis hat keinen
@@ -313,6 +362,9 @@ function anzeige () {
     // Für die Fassade macht es keinen Unterschied — für Simulator, Statusseite
     // und spätere Auswertung schon: das hier kam nicht aus dem Publikum.
     hinweis: f.ende > t && f.hinweisId !== null,
+    // Auch das ist keine Publikumsbotschaft — Simulator und Moderation sollen
+    // es zeigen, damit niemand ein Fuellsel fuer eine echte Botschaft haelt.
+    fuellsel: f.ende > t && f.fuellselId !== null,
     restSekunden: f.ende > t ? Math.round((f.ende - t) / 100) / 10 : 0,
     schrifthoehe: f.groesse ? f.groesse.schrifthoehe : null,
     versalhoehe: f.groesse ? f.groesse.versalhoehe : null,

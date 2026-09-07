@@ -31,6 +31,7 @@ const moderation = require('./moderation');
 const einstellungen = require('./einstellungen');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
+const fuellsel = require('./fuellsel');
 const belegungsplan = require('./belegungsplan');
 const puls = require('./puls');
 
@@ -353,6 +354,35 @@ fastify.post('/api/moderation/hinweis-scharf', async (req, reply) => {
     // gerade, wer sie bekommt.
     scheduler.planFlaecheLeeren(cfg.hinweisFlaeche);
     req.log.warn({ nr: req.body?.nr, wert: Boolean(req.body?.wert) }, 'Hinweis geschaltet');
+    return stand;
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
+  }
+});
+
+// ---------------------------------------------------------------- Fuellsel
+// Eigene Texte, die Luecken schliessen — am leeren Anfang und auf schmalen
+// Saeulen. Sie verdraengen nie eine Botschaft; sie kommen nur, wo sonst
+// nichts stuende.
+
+fastify.get('/api/moderation/fuellsel', async () => fuellsel.stand());
+
+fastify.post('/api/moderation/fuellsel', async (req, reply) => {
+  const zeilen = Array.isArray(req.body?.zeilen) ? req.body.zeilen : null;
+  if (!zeilen) return reply.code(400).send({ fehler: 'Es fehlen die Zeilen.' });
+  if (zeilen.length > 30) return reply.code(400).send({ fehler: 'Hoechstens 30 Plaetze.' });
+  try {
+    fuellsel.speichern(zeilen);
+    return fuellsel.stand();
+  } catch (e) {
+    return reply.code(400).send({ fehler: e.message });
+  }
+});
+
+fastify.post('/api/moderation/fuellsel-aktiv', async (req, reply) => {
+  try {
+    const stand = fuellsel.aktivSetzen(req.body?.nr, Boolean(req.body?.wert));
+    req.log.warn({ nr: req.body?.nr, wert: Boolean(req.body?.wert) }, 'Fuellsel geschaltet');
     return stand;
   } catch (e) {
     return reply.code(400).send({ fehler: e.message });

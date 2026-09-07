@@ -19,6 +19,7 @@ const { groesseFuer } = require('./text');
 const scheduler = require('./scheduler');
 const einstellungen = require('./einstellungen');
 const puls = require('./puls');
+const fuellsel = require('./fuellsel');
 const sessionen = require('./sessionen');
 const hinweise = require('./hinweise');
 
@@ -160,6 +161,12 @@ function kennzahlen () {
     schalter: einstellungen.schalter(),
     // Lebt die Bridge? Der Server sieht sie nur, wenn sie sich meldet.
     bridge: puls.stand(),
+    // Wie viele Flaechen gerade mit eigenen Texten gefuellt sind. Am Abend
+    // die Antwort auf "warum steht da nichts von den Leuten?".
+    fuellsel: {
+      aktive: fuellsel.aktive().length,
+      aufFlaechen: scheduler.anzeige().filter(f => f.fuellsel).length
+    },
     // Der Sessionstand faehrt hier mit, damit der Balken oben in der Oberflaeche
     // aus derselben Abfrage lebt wie die Zahlen — eine Anfrage statt zwei.
     session: sessionen.stand(),
