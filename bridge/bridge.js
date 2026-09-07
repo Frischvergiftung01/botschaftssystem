@@ -76,8 +76,8 @@ function starten (zusatz = {}) {
       + `${verbindung.spalte} „${verbindung.clipName}", ${verbindung.flaechen.size} Flächen, `
       + `Weg /${verbindung.pfad}/`);
     if (!verbindung.verbunden) {
-      sagen('ACHTUNG: dieser Clip läuft nicht — es wird geschrieben, aber nichts zu sehen sein. '
-        + 'In Arena den Clip mit dem Patch triggern.');
+      sagen('Der Clip ist gerade nicht getriggert — es wird trotzdem geschrieben, '
+        + 'der Stand erscheint beim nächsten Triggern.');
     }
     if (verbindung.instanzen > 1) {
       sagen(`Hinweis: der Patch liegt ${verbindung.instanzen}× in der Komposition — `
@@ -88,24 +88,39 @@ function starten (zusatz = {}) {
   }
 
   /**
-   * Waechter: laeuft der Clip noch, in den wir schreiben?
+   * Waechter: schreiben wir noch dorthin, wo es hingehoert?
    *
-   * Am 07.09.2026 hat genau das eine Stunde gekostet — die Bridge schrieb
-   * fehlerfrei in eine von drei Instanzen des Patches, und zwar in die
-   * falsche. Ein Fehler meldet sich hier nicht von selbst: alle Aufrufe
-   * gelingen, die Wand steht still. Deshalb wird regelmaessig nachgesehen.
+   * Zwei verschiedene Sorgen, und nur eine davon ist ein Fehler:
+   *
+   * 1. MEHRERE Instanzen des Patches in der Komposition. Dann heisst "der
+   *    Clip laeuft nicht mehr", dass jemand eine andere getriggert hat — es
+   *    wird neu gesucht. (Am 07.09.2026 hat genau das eine Stunde gekostet:
+   *    alle Aufrufe gelangen, die Wand stand still.)
+   * 2. EINE Instanz, entriggert. Das ist der Normalfall waehrend der
+   *    Mapping-Show und kein Fehler; es gibt auch nichts anderes zu finden.
+   *    Gemerkt wird es trotzdem: sobald wieder getriggert wird, schreibt die
+   *    Bridge einmal alles hin, damit die Wand nicht erst nach und nach
+   *    aufwacht.
    */
   async function wachen () {
     if (!verbindung || Date.now() - letzteWacht < e.wachtMs) return;
     letzteWacht = Date.now();
-    let laeuftNoch = true;
+    let laeuftNoch;
     try {
       laeuftNoch = await arena.nochVerbunden(e.arena, verbindung.layer, verbindung.spalte);
     } catch { return; }                      // Netzhaenger sind Sache des Taktes
-    if (laeuftNoch) return;
-    sagen('Der Clip mit dem Patch läuft nicht mehr — es wird neu gesucht');
-    verbindung = null;
-    for (const z of flaechen.values()) z.gezeigt = null;
+
+    if (!laeuftNoch && verbindung.instanzen > 1) {
+      sagen('Der Clip mit dem Patch läuft nicht mehr — es wird neu gesucht');
+      verbindung = null;
+      for (const z of flaechen.values()) z.gezeigt = null;
+      return;
+    }
+    if (laeuftNoch && !verbindung.verbunden) {
+      sagen('Clip wieder getriggert — der aktuelle Stand wird einmal komplett geschrieben');
+      for (const z of flaechen.values()) z.gezeigt = null;   // erzwingt den Abgleich
+    }
+    verbindung.verbunden = laeuftNoch;
   }
 
   async function setzen (id, wert) {

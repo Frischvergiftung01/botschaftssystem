@@ -11,11 +11,15 @@
 //    "Blende 33" — die fuehrende Zahl ist die Flaechennummer. Wer im Patch ein
 //    Feld umbenennt oder verschiebt, muss hier nichts nachtragen; wer die
 //    Nummer entfernt, merkt es beim Start sofort.
-//    ABER: gesucht wird nur im LAUFENDEN Clip. In einer gewachsenen
-//    Komposition liegt derselbe Effekt mehrfach herum — am 07.09.2026 waren es
-//    drei Instanzen, und die Bridge schrieb tadellos in eine, die niemand
-//    sieht. Ein Clip, der nicht "Connected" ist, wird nicht gerendert; er
-//    kommt deshalb nur in Frage, wenn gar kein laufender zu finden ist.
+// ABER: bei MEHREREN Instanzen entscheidet, welche laeuft. In einer
+//    gewachsenen Komposition liegt derselbe Effekt mehrfach herum — am
+//    07.09.2026 waren es drei, und die Bridge schrieb tadellos in eine, die
+//    niemand sieht.
+//    Umgekehrt ist "nicht getriggert" KEIN Fehler: die Parameter gehoeren dem
+//    Clip, nicht der Wiedergabe. Waehrend der Mapping-Show wird der
+//    Botschaften-Clip entriggert; geschrieben wird trotzdem weiter, und beim
+//    naechsten Triggern steht der aktuelle Stand sofort da. Gibt es nur eine
+//    Instanz, wird sie deshalb genommen, ob sie laeuft oder nicht.
 // 2. Der Pfad zur Parameterschnittstelle wird beim Start PROBIERT. Arena hat
 //    ihn zwischen Fassungen schon einmal verschoben; zwei Anfragen beim Start
 //    sind billiger als eine Bridge, die am Veranstaltungsabend an einem
@@ -102,9 +106,9 @@ async function verbinden (arenaBasis) {
       + 'Liegt "FVG Message Wall v2" auf einem Clip?');
   }
   // Erst die laufenden Clips, und darunter der Effekt mit den meisten
-  // vollstaendigen Paaren. Nur wenn gar keiner laeuft, wird der beste
-  // stillliegende genommen — dann stimmt zwar das Schreiben, aber es ist
-  // nichts zu sehen, und genau das sagt `verbunden: false` dem Aufrufer.
+  // vollstaendigen Paaren. Laeuft keiner, wird der beste stillliegende
+  // genommen — bei nur einer Instanz ist das der Normalfall waehrend der
+  // Mapping-Show. `verbunden` sagt dem Aufrufer, was gerade zu sehen ist.
   const laufende = treffer.filter(t => t.verbunden);
   const bester = (laufende.length ? laufende : treffer)
     .sort((a, b) => paare(b) - paare(a))[0];

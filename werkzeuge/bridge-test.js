@@ -48,7 +48,7 @@ const schlaf = ms => new Promise(r => setTimeout(r, ms));
 // mitschreiben. `weg` bestimmt, unter welchem Pfad sie die Parameter anbietet
 // — damit laesst sich die Pfadprobe der Bridge nachstellen.
 
-function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) {
+function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0, einzeln = false } = {}) {
   const zustand = {
     weg,
     idVersatz,
@@ -56,7 +56,8 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) 
     kompositionAbrufe: 0,
     // Welche der beiden Instanzen laeuft gerade? Genau daran ist die Bridge
     // am 07.09.2026 gescheitert: sie schrieb in eine stillliegende.
-    laeuft: 'neu'
+    laeuft: 'neu',
+    einzeln
   };
 
   const felder = (textBasis, blendeBasis) => Object.fromEntries([
@@ -84,10 +85,12 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) 
     layers: [
       // Eine aeltere Fassung, die in einer unbenutzten Spalte liegen geblieben ist.
       { name: { value: 'Shows' },
-        clips: [
-          clip('FVG Message Wall', felder(8000, 9000), zustand.laeuft === 'alt'),
-          clip('FVG Message Wall v2', felder(5000, 6000), zustand.laeuft === 'neu')
-        ],
+        clips: zustand.einzeln
+          ? [clip('FVG Message Wall v2', felder(5000, 6000), zustand.laeuft === 'neu')]
+          : [
+            clip('FVG Message Wall', felder(8000, 9000), zustand.laeuft === 'alt'),
+            clip('FVG Message Wall v2', felder(5000, 6000), zustand.laeuft === 'neu')
+          ],
         // Arena liefert den laufenden Clip zusaetzlich als Zweitschrift.
         active_clip: clip('FVG Message Wall v2', felder(5000, 6000), true) }
     ]
@@ -103,8 +106,9 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0 } = {}) 
     // Der Waechter fragt einen einzelnen Clip ab.
     const wache = /^composition\/layers\/1\/clips\/(\d)$/.exec(url);
     if (wache) {
-      const laeuft = (wache[1] === '1' && zustand.laeuft === 'alt') ||
-                     (wache[1] === '2' && zustand.laeuft === 'neu');
+      const spalte = Number(wache[1]);
+      const gemeint = zustand.einzeln ? 'neu' : (spalte === 1 ? 'alt' : 'neu');
+      const laeuft = zustand.laeuft === gemeint;
       antwort.writeHead(200, { 'content-type': 'application/json' });
       return antwort.end(JSON.stringify({
         connected: { value: laeuft ? 'Connected & previewing' : 'Disconnected' }
@@ -264,6 +268,32 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
       zweite.ereignisse.length);
     await lauf2.stoppen();
     await zweite.schliessen();
+  }
+
+  console.log('\nEine Instanz, entriggert: die Show läuft, geschrieben wird weiter');
+  {
+    const einzelne = attrappe({ einzeln: true });
+    einzelne.laeuft = 'keins';                 // Clip nicht getriggert, wie waehrend der Mapping-Show
+    const port = await einzelne.starten();
+    const lauf3 = bridge.starten({
+      server: BASIS, arena: `http://127.0.0.1:${port}/api/v1`,
+      taktMs: 200, blendeMs: 350, wachtMs: 800, ruhig: true
+    });
+    while (einzelne.ereignisse.length < FLAECHEN.length * 2) await schlaf(100);
+    pruefe('auch ohne getriggerten Clip wird geschrieben',
+      einzelne.ereignisse.length >= FLAECHEN.length * 2, einzelne.ereignisse.length);
+
+    const vorher = einzelne.ereignisse.length;
+    einzelne.laeuft = 'neu';                   // jetzt wird getriggert
+    await schlaf(2500);
+    const neu = einzelne.ereignisse.slice(vorher);
+    const texte = new Set(neu.filter(e => e.id < 6000).map(e => e.id));
+    pruefe('beim Triggern wird der ganze Stand einmal hingeschrieben',
+      texte.size === FLAECHEN.length, texte.size);
+    pruefe('und es wurde nicht neu gesucht — es gibt ja nur die eine Instanz',
+      einzelne.kompositionAbrufe === 1, einzelne.kompositionAbrufe);
+    await lauf3.stoppen();
+    await einzelne.schliessen();
   }
 
   await fastify.close();
