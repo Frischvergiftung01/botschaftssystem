@@ -67,7 +67,7 @@ async function balkenText (seite) {
 
   console.log('\nZeiten erzeugen und speichern');
   {
-    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.click('.seiten a[data-ansicht="spielzeiten"]');
     pruefe('der Reiter geht auf', await seite.locator('#spielzeiten').isVisible());
     pruefe('noch keine Zeile', (await seite.locator('.planzeile').count()) === 0);
 
@@ -185,7 +185,7 @@ async function balkenText (seite) {
 
   console.log('\nSchalter Belegungsplan im Reiter Werkzeuge');
   {
-    await seite.click('nav button[data-ansicht="werkzeuge"]');
+    await seite.click('.seiten a[data-ansicht="werkzeuge"]');
     await seite.waitForTimeout(200);
     pruefe('der Knopf ist da', await seite.locator('#sPlan').isVisible());
     pruefe('und steht auf an', /Belegungsplan an/.test(await seite.locator('#sPlan').textContent()),
@@ -206,7 +206,7 @@ async function balkenText (seite) {
     const zurueck = await (await kontext.request.get(BASIS + '/api/moderation/kennzahlen')).json();
     pruefe('und wieder zurueck', zurueck.schalter.belegungsplan === true, JSON.stringify(zurueck.schalter));
 
-    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.click('.seiten a[data-ansicht="spielzeiten"]');
     await seite.waitForTimeout(200);
   }
 
@@ -217,12 +217,24 @@ async function balkenText (seite) {
       (await leiste.first().textContent()).trim() === 'Moderation',
       await leiste.first().textContent());
     pruefe('und faellt auf', (await leiste.first().getAttribute('class') || '').includes('zurueck'));
-    pruefe('der Monitor steht neben Gesundheit und geht ins eigene Fenster',
+    pruefe('der Monitor steht rechts und geht ins eigene Fenster',
       (await leiste.last().textContent()).trim() === 'Monitor im eigenen Fenster' &&
       (await leiste.last().getAttribute('target')) === '_blank',
       await leiste.last().textContent());
-    pruefe('der Reiter heisst jetzt Vorgefertigte Texte',
-      /Vorgefertigte Texte/.test(await seite.locator('nav button[data-ansicht="fuellsel"]').textContent()));
+    pruefe('die Einrichtungsseiten stehen in derselben Leiste',
+      (await seite.locator('.seiten a[data-ansicht]').count()) === 4,
+      await seite.locator('.seiten a[data-ansicht]').count());
+    pruefe('darunter die vorgefertigten Texte',
+      /Vorgefertigte Texte/.test(await seite.locator('.seiten a[data-ansicht="fuellsel"]').textContent()));
+    pruefe('die Reiter zeigen nur noch Botschaften',
+      (await seite.locator('nav button').count()) === 4,
+      await seite.locator('nav button').count());
+    pruefe('und die Leiste steht ueber den Reitern',
+      await seite.evaluate(() => {
+        const leiste = document.querySelector('.seiten');
+        const reiter = document.querySelector('nav');
+        return leiste.compareDocumentPosition(reiter) & Node.DOCUMENT_POSITION_FOLLOWING;
+      }));
 
     // Eine Nebenseite ganzflaechig oeffnen und ueber den Knopf zurueckfinden.
     await seite.click('.seiten a:has-text("Statusseite")');
@@ -257,7 +269,7 @@ async function balkenText (seite) {
 
   console.log('\nFuellsel: Plaetze bearbeiten und schalten');
   {
-    await seite.click('nav button[data-ansicht="fuellsel"]');
+    await seite.click('.seiten a[data-ansicht="fuellsel"]');
     await seite.waitForTimeout(300);
     pruefe('der Reiter geht auf', await seite.locator('#fuellsel').isVisible());
     const karten = await seite.locator('#fuellselListe .fuellsel-karte').count();
@@ -295,7 +307,7 @@ async function balkenText (seite) {
 
   console.log('\nEinrichtungsmodus: der rote Balken');
   {
-    await seite.click('nav button[data-ansicht="werkzeuge"]');
+    await seite.click('.seiten a[data-ansicht="werkzeuge"]');
     await seite.waitForTimeout(200);
     pruefe('kein Balken im Normalbetrieb', await seite.locator('#einrichtungsbalken').isHidden());
 
@@ -316,7 +328,7 @@ async function balkenText (seite) {
     await seite.waitForFunction(() => document.getElementById('einrichtungsbalken').hidden);
     pruefe('der Knopf im Balken beendet ihn', await seite.locator('#einrichtungsbalken').isHidden());
 
-    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.click('.seiten a[data-ansicht="spielzeiten"]');
     await seite.waitForTimeout(200);
   }
 
@@ -329,7 +341,7 @@ async function balkenText (seite) {
       /HH:MM/.test(await seite.locator('#planStand').textContent()),
       await seite.locator('#planStand').textContent());
     // wieder in Ordnung bringen
-    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.click('.seiten a[data-ansicht="spielzeiten"]');
     await seite.waitForTimeout(300);
   }
 
@@ -372,7 +384,7 @@ async function balkenText (seite) {
 
     // Die Lagespalte hat sich frueher die Knopffarbe eingefangen (.weg gehoert
     // dem Ablehnen-Knopf) und stand als roter Balken quer in der Zeile.
-    await seite.click('nav button[data-ansicht="spielzeiten"]');
+    await seite.click('.seiten a[data-ansicht="spielzeiten"]');
     await seite.waitForTimeout(400);
     const lage = seite.locator('.planzeile .lage').first();
     pruefe('die Zeile ist als abgebrochen vermerkt',
@@ -383,7 +395,7 @@ async function balkenText (seite) {
 
   console.log('\nHinweise vom Platz');
   {
-    await seite.click('nav button[data-ansicht="hinweise"]');
+    await seite.click('.seiten a[data-ansicht="hinweise"]');
     pruefe('der Reiter geht auf', await seite.locator('#hinweise').isVisible());
     // Die Plaetze kommen ueber die Schnittstelle, also erst abwarten.
     await seite.waitForFunction(() => document.querySelectorAll('.hinweis-karte').length > 0);
@@ -430,7 +442,7 @@ async function balkenText (seite) {
     await seite.click('nav button[data-ansicht="uebersicht"]');
     pruefe('Uebersicht kommt zurueck', await seite.locator('#raster').isVisible());
     pruefe('Spielzeiten sind weg', await seite.locator('#spielzeiten').isHidden());
-    await seite.click('nav button[data-ansicht="werkzeuge"]');
+    await seite.click('.seiten a[data-ansicht="werkzeuge"]');
     pruefe('Werkzeuge gehen noch auf', await seite.locator('#werkzeuge').isVisible());
   }
 

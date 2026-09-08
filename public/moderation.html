@@ -103,6 +103,9 @@
   .seiten a{color:var(--gold);text-decoration:none}
   .seiten a:hover{text-decoration:underline}
   .seiten a.offen{color:var(--text);text-decoration:underline}
+  /* Welche Einrichtungsseite gerade offen ist, soll man in der Leiste sehen —
+     sonst sucht man den Weg zurueck in die Warteschlange. */
+  .seiten a.aktiv{color:var(--text);font-weight:650;text-decoration:underline}
   /* Zurueck zur Warteschlange — der einzige Eintrag, den man im Zweifel
      sucht, also der einzige mit Rahmen. */
   .seiten a.zurueck{color:var(--text);font-weight:650;font-size:.86rem;
@@ -222,15 +225,18 @@
   <span class="rechts"><button class="pille" id="einrichtungAus">Beenden</button></span>
 </div>
 
+<div class="seiten">
+  <!-- EINE Leiste fuer alles, was nicht Warteschlange ist: der Weg zurueck
+       ganz links, dann die Seiten zum Einrichten, dann die oeffentlichen
+       Seiten, und rechts abgesetzt das, was auf den zweiten Bildschirm
+       gehoert. Die Reiter darunter zeigen nur noch Botschaften. -->
+  <a href="#moderation" class="zurueck">Moderation</a><span>·</span><a href="/simulator" data-modus="unten">Moderation mit Simulator</a><span>·</span><a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span><a href="#ansicht" data-ansicht="spielzeiten">Spielzeiten</a><span>·</span><a href="#ansicht" data-ansicht="hinweise">Hinweise</a><span>·</span><a href="#ansicht" data-ansicht="fuellsel">Vorgefertigte Texte</a><span>·</span><a href="#ansicht" data-ansicht="werkzeuge">Werkzeuge</a><span>·</span><a href="/">Eingabeseite</a><span>·</span><a href="/status">Statusseite</a><a href="/simulator" class="ganzRechts" target="_blank" rel="noopener">Simulator im eigenen Fenster</a><span>·</span><a href="/moderation/monitor" target="_blank" rel="noopener">Monitor im eigenen Fenster</a></div>
+
 <nav>
 <button data-ansicht="uebersicht" class="aktiv">Übersicht</button>
   <button data-ansicht="zurueckgestellt">Zurückgestellt<kbd>T</kbd></button>
   <button data-ansicht="pool">Auf der Fassade<kbd>P</kbd></button>
   <button data-ansicht="abgelehnt">Abgelehnt<kbd>X</kbd></button>
-  <button data-ansicht="spielzeiten">Spielzeiten</button>
-  <button data-ansicht="hinweise">Hinweise</button>
-  <button data-ansicht="fuellsel">Vorgefertigte Texte</button>
-  <button data-ansicht="werkzeuge">Werkzeuge</button>
 </nav>
 
 <main>
@@ -395,11 +401,7 @@
 </main>
 
 
-<div class="seiten">
-  <!-- Der Weg zurueck steht ganz links und faellt auf: wer eine Nebenseite
-       offen hat, sucht sonst, wie er wieder an seine Warteschlange kommt.
-       Rechts stehen die beiden Seiten fuer den zweiten Bildschirm. -->
-  <a href="#moderation" class="zurueck">Moderation</a><span>·</span><a href="/simulator" data-modus="unten">Moderation mit Simulator</a><span>·</span><a href="/moderation/eingabe">Botschaft einstellen</a><span>·</span><a href="/">Eingabeseite</a><span>·</span><a href="/status">Statusseite</a><a href="/simulator" class="ganzRechts" target="_blank" rel="noopener">Simulator im eigenen Fenster</a><span>·</span><a href="/moderation/monitor" target="_blank" rel="noopener">Monitor im eigenen Fenster</a></div>
+
 <section id="rahmen" hidden>
   <div id="rahmenkopf">
     <b id="rahmenTitel"></b>
@@ -444,6 +446,13 @@ async function start () {
       // ab — Simulator und Monitor gehoeren am Abend auf den zweiten Schirm.
       if (a.target === '_blank') return;
       e.preventDefault();
+      // Die Seiten zum Einrichten sind Ansichten der Moderation, keine
+      // Nebenseiten — sie laufen ueber dieselbe Umschaltung wie die Reiter.
+      if (a.dataset.ansicht) {
+        if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
+        wechseln(a.dataset.ansicht);
+        return;
+      }
       const ziel = a.getAttribute('href');
       if (ziel === '#moderation') {
         // Alles zu, auch der mitlaufende Simulator: wer hier klickt, will die
@@ -636,6 +645,8 @@ function wechseln (neu) {
   if (!el('rahmen').hidden && !el('rahmen').classList.contains('unten')) rahmenZu();
   ansicht = neu;
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.ansicht === neu));
+  document.querySelectorAll('.seiten a[data-ansicht]').forEach(a =>
+    a.classList.toggle('aktiv', a.dataset.ansicht === neu));
   const haupt = neu === 'uebersicht';
   el('einzeln').hidden = !haupt;
   el('raster').hidden = !haupt;
