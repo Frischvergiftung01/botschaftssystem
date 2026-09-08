@@ -22,6 +22,8 @@ for (const e of ['', '-wal', '-shm']) fs.rmSync(process.env.DB_PFAD + e, { force
 const { chromium } = require('playwright');
 const { fastify, start } = require('../src/server');
 const einstellungen = require('../src/einstellungen');
+const moderation = require('../src/moderation');
+const { abfragen } = require('../src/db');
 const puls = require('../src/puls');
 
 let fehler = 0;
@@ -104,6 +106,49 @@ const klasse = (seite, w) => seite.locator(w).getAttribute('class');
     pruefe('der Einrichtungsmodus wird ausdruecklich genannt',
       /Flächennamen/.test(await text(seite, '#rSchalter')), await text(seite, '#rSchalter'));
     einstellungen.setzen('einrichtung', false);
+  }
+
+  console.log('\nDer Abend in Zahlen');
+  {
+    // Vier Botschaften mit verschiedenem Schicksal: eine vom Filter abgelehnt,
+    // eine von der Moderation, eine freigegeben, eine wartend.
+    const einstellen = (text, status, urteil) => abfragen.einfuegen.run({
+      text, name: null, status, token: 'z-' + Math.random().toString(36).slice(2),
+      geraet: 'zahlen', filter: JSON.stringify({ urteil }),
+      erstellt_am: Date.now(), entschieden_am: status === 'neu' ? null : Date.now(),
+      unsicher: 0
+    });
+    einstellen('Vom Filter abgelehnt', 'abgelehnt', 'ABLEHNEN');
+    einstellen('Von der Moderation abgelehnt', 'abgelehnt', 'PRUEFEN');
+    einstellen('Freigegeben', 'freigegeben', 'FREI');
+    einstellen('Wartet noch', 'neu', 'PRUEFEN');
+
+    const a = moderation.abend();
+    pruefe('eingegangen zaehlt alles', a.eingegangen === 4, a.eingegangen);
+    pruefe('die beiden Ablehnungen werden getrennt',
+      a.filterAbgelehnt === 1 && a.moderationAbgelehnt === 1,
+      a.filterAbgelehnt + ' / ' + a.moderationAbgelehnt);
+    pruefe('freigegeben und wartend stimmen',
+      a.freigegeben === 1 && a.wartend === 1, a.freigegeben + ' / ' + a.wartend);
+
+    await seite.waitForFunction(() => /Eingegangen/.test(document.getElementById('wAbend').textContent));
+    await seite.waitForFunction(() => /4/.test(document.getElementById('wAbend').textContent));
+    const kachel = await text(seite, '#wAbend');
+    pruefe('die Kachel zeigt sie an', /Eingegangen/.test(kachel) && /vom Filter abgelehnt/.test(kachel), kachel);
+    pruefe('mit Einblendungen und Mittelwert',
+      /Einblendungen/.test(kachel) && /je Botschaft/.test(kachel), kachel);
+    pruefe('und sagt, seit wann gezaehlt wird',
+      /Gezählt seit der ersten Botschaft am \d\d\.\d\d\.\d{4}/.test(await text(seite, '#rAbend')),
+      await text(seite, '#rAbend'));
+
+    // Nach dem Leeren steht dort das Datum der Leerung.
+    moderation.datenbankLeeren();
+    await seite.waitForFunction(() => /Leeren/.test(document.getElementById('rAbend').textContent));
+    pruefe('nach dem Leeren zaehlt es ab dem Leerungszeitpunkt',
+      /Gezählt seit dem Leeren am \d\d\.\d\d\.\d{4}, \d\d:\d\d Uhr/.test(await text(seite, '#rAbend')),
+      await text(seite, '#rAbend'));
+    pruefe('und faengt bei null an', moderation.abend().eingegangen === 0,
+      moderation.abend().eingegangen);
   }
 
   console.log('\nKonsole');

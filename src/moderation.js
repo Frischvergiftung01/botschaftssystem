@@ -182,8 +182,9 @@ function kennzahlen () {
         }
       };
     })(),
-    // Stufe 1b faehrt mit, damit die Monitoring-Seite mit einer Abfrage
-    // auskommt.
+    // Die Zahlen des Abends und Stufe 1b fahren mit, damit die
+    // Monitoring-Seite mit einer Abfrage auskommt.
+    abend: abend(),
     stufe1b: { aktiv: mistral.aktiv(), modell: cfg.mistralModell, ...mistral.kennzahlen() },
     // Der Sessionstand faehrt hier mit, damit der Balken oben in der Oberflaeche
     // aus derselben Abfrage lebt wie die Zahlen — eine Anfrage statt zwei.
@@ -199,12 +200,53 @@ function kennzahlen () {
 }
 
 /**
+ * Die Zahlen des Abends — alles seit dem letzten Leeren.
+ *
+ * Der Bezugspunkt ergibt sich von selbst: das Leeren loescht alle Zeilen, also
+ * zaehlt jede Abfrage ohnehin ab da. Festgehalten wird nur der Zeitpunkt,
+ * damit ueber der Kachel stehen kann, seit wann gezaehlt wird.
+ */
+function abend () {
+  const nach = { neu: 0, freigegeben: 0, zurueckgestellt: 0, gesperrt: 0, abgelehnt: 0 };
+  let vomFilter = 0, eingegangen = 0;
+  for (const z of abfragen.abendZahlen.all()) {
+    eingegangen += z.n;
+    if (z.status in nach) nach[z.status] += z.n;
+    if (z.status === 'abgelehnt' && z.vom_filter) vomFilter += z.n;
+  }
+  const einblendungen = abfragen.einblendungen.get().n;
+  const geleert = abfragen.einstellungLesen.get(GELEERT);
+  return {
+    eingegangen,
+    filterAbgelehnt: vomFilter,
+    // Was die Filterkette durchgelassen hat und ein Mensch abgelehnt hat.
+    moderationAbgelehnt: nach.abgelehnt - vomFilter,
+    freigegeben: nach.freigegeben,
+    wartend: nach.neu,
+    zurueckgestellt: nach.zurueckgestellt,
+    gesperrt: nach.gesperrt,
+    einblendungen,
+    jeBotschaft: nach.freigegeben ? Math.round(einblendungen / nach.freigegeben * 10) / 10 : 0,
+    // null heisst: noch nie geleert. Dann zaehlt es ab der aeltesten Botschaft.
+    geleertAm: geleert ? Number(geleert.wert) : null,
+    seit: geleert ? Number(geleert.wert) : (abfragen.aeltesteBotschaft.get().zeit || null)
+  };
+}
+
+/**
  * Datenbank leeren — für die Vorbereitung, nicht für den Abend. Dreimal über
  * das Container-Terminal war ein Zeichen, dass das Werkzeug hier fehlt.
  */
+const GELEERT = 'geleert_am';
+
 const leerenTx = db.transaction(() => {
   abfragen.alleAnzeigenLoeschen.run();
   const n = abfragen.alleBotschaftenLoeschen.run().changes;
+  // Wann geleert wurde, gehoert festgehalten: alle Zahlen des Abends zaehlen
+  // ab diesem Punkt, und "seit wann" soll man nicht raten muessen.
+  abfragen.einstellungSchreiben.run({
+    schluessel: GELEERT, wert: String(Date.now()), geaendert_am: Date.now()
+  });
   return n;
 });
 
@@ -215,4 +257,4 @@ function datenbankLeeren () {
   return geloescht;
 }
 
-module.exports = { queue, entscheiden, kennzahlen, datenbankLeeren, optik, aufbereiten, ZIEL };
+module.exports = { queue, entscheiden, kennzahlen, abend, datenbankLeeren, optik, aufbereiten, ZIEL };

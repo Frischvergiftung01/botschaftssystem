@@ -155,6 +155,19 @@ const abfragen = {
                               SET anzahl_anzeigen = anzahl_anzeigen + 1, zuletzt_gezeigt = @zeit
                               WHERE id = @id`),
 
+  // ---- Zahlen des Abends -------------------------------------------------
+  // Eine Abfrage fuer die ganze Kachel. Getrennt wird nach Status UND danach,
+  // ob schon die Filterkette abgelehnt hat: beides steht als `abgelehnt` in
+  // derselben Spalte, aber "hat nie ein Mensch gesehen" ist die interessantere
+  // Zahl. Das Urteil liegt im mitgeschriebenen Filterergebnis.
+  abendZahlen: db.prepare(`SELECT status,
+                                  CASE WHEN json_extract(filter, '$.urteil') = 'ABLEHNEN'
+                                       THEN 1 ELSE 0 END AS vom_filter,
+                                  count(*) AS n
+                           FROM botschaften GROUP BY status, vom_filter`),
+  einblendungen: db.prepare('SELECT count(*) AS n FROM anzeigen'),
+  aeltesteBotschaft: db.prepare('SELECT min(erstellt_am) AS zeit FROM botschaften'),
+
   // ---- Fuellsel ----------------------------------------------------------
   fuellselListe: db.prepare('SELECT * FROM fuellsel ORDER BY nr ASC'),
   fuellselLeeren: db.prepare('DELETE FROM fuellsel'),
