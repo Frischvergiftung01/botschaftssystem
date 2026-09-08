@@ -37,7 +37,8 @@
      ohne Umrechnerei an der richtigen Stelle. `screen` blendet Schwarz weg;
      fehlt die Datei, bleibt es beim dunklen Grund und der Punkt steht immer
      noch richtig. */
-  .plankarte{padding:14px}
+  /* Kein eigener Rahmen mehr: der Plan sitzt in der Statuskarte. */
+  .plankarte{margin:4px 0 2px}
   /* Zwei Ansichten desselben Bildes.
      Die Übersicht beantwortet "welches Ende des Gebäudes", der Ausschnitt
      "welche Säule". Auf einem Handy ist die Übersicht allein zu flach: 6,4:1
@@ -66,7 +67,7 @@
   .ausschnitt .marke{width:18px;height:18px;margin:-9px 0 0 -9px}
   .fassade.jetzt .marke{background:var(--gruen);
     box-shadow:0 0 0 3px rgba(126,224,168,.25),0 0 20px 5px rgba(126,224,168,.55)}
-  .planfuss{display:flex;justify-content:space-between;gap:10px;margin:10px 2px 0;
+  .planfuss{display:flex;gap:10px;margin:8px 2px 2px;
     color:var(--leise);font-size:.82rem}
   .planfuss b{color:var(--text);font-weight:600}
 </style>
@@ -79,21 +80,21 @@
 
 <div class="karte" id="statuskarte">
   <h2 id="ueberschrift">Wird geprüft</h2>
+  <!-- Erst das Bild, dann das Wort: in der Probe hat sich gezeigt, dass man
+       zuerst hinsieht, WO es leuchtet, und die Ortsangabe danach als
+       Bestätigung liest. Stand der Plan darunter in einer eigenen Karte,
+       wurde er auf dem Handy leicht ganz übersehen. -->
+  <div class="plankarte" id="plankarte" hidden>
+    <div class="fassade uebersicht" id="uebersicht">
+      <div class="lupe" id="lupe"></div>
+      <div class="marke" id="marke"></div>
+    </div>
+    <div class="fassade ausschnitt" id="ausschnitt"><div class="marke" id="markeGross"></div></div>
+    <div class="planfuss"><span id="planSeite"></span></div>
+  </div>
   <p class="gross" id="kernaussage">Einen Moment …</p>
   <p class="leise" id="erklaerung"></p>
   <div class="balken"><div id="balken"></div></div>
-</div>
-
-<div class="karte plankarte" id="plankarte" hidden>
-  <div class="fassade uebersicht" id="uebersicht">
-    <div class="lupe" id="lupe"></div>
-    <div class="marke" id="marke"></div>
-  </div>
-  <div class="fassade ausschnitt" id="ausschnitt"><div class="marke" id="markeGross"></div></div>
-  <div class="planfuss">
-    <span id="planOrt"></span>
-    <span id="planSeite"></span>
-  </div>
 </div>
 
 <a class="knopf" id="weiter" href="/">Noch eine Botschaft schicken</a>
@@ -183,7 +184,8 @@ function planZeigen (f, laeuftGerade) {
 
   el('uebersicht').classList.toggle('jetzt', Boolean(laeuftGerade));
   el('ausschnitt').classList.toggle('jetzt', Boolean(laeuftGerade));
-  el('planOrt').innerHTML = '<b>' + f.ort + '</b>';
+  // Der Ort steht gross unter dem Plan (Element `kernaussage`) — hier nur noch
+  // die Gebaeudehaelfte, damit dasselbe nicht zweimal dasteht.
   el('planSeite').textContent = SEITE[f.seite] || '';
 }
 

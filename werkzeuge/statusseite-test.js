@@ -86,11 +86,19 @@ const schlaf = ms => new Promise(r => setTimeout(r, ms));
     await seite.goto(BASIS + '/status?t=' + token, { waitUntil: 'networkidle' });
     await seite.waitForFunction(() => !document.getElementById('plankarte').hidden, null, { timeout: 15000 });
     pruefe('der Fassadenplan ist da', await seite.locator('#plankarte').isVisible());
-    pruefe('die Marke steht drin', await seite.locator('#marke').isVisible());
-    pruefe('der Ort steht darunter',
-      (await seite.locator('#planOrt').textContent()).length > 3,
-      await seite.locator('#planOrt').textContent());
-    pruefe('die Gebaeudehaelfte auch',
+    pruefe('er steht ueber der Ortsangabe, nicht darunter',
+      await seite.evaluate(() => {
+        const plan = document.getElementById('plankarte');
+        const ort = document.getElementById('kernaussage');
+        return plan.compareDocumentPosition(ort) & Node.DOCUMENT_POSITION_FOLLOWING;
+      }));
+    pruefe('und in derselben Karte',
+      await seite.evaluate(() => document.getElementById('statuskarte')
+        .contains(document.getElementById('plankarte'))));
+    pruefe('die Ortsangabe steht gross darunter',
+      (await seite.locator('#kernaussage').textContent()).length > 3,
+      await seite.locator('#kernaussage').textContent());
+    pruefe('die Gebaeudehaelfte steht dabei',
       /Gebäude/.test(await seite.locator('#planSeite').textContent()),
       await seite.locator('#planSeite').textContent());
 
