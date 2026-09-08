@@ -152,12 +152,12 @@ function zeichnen () {
     const anteil = f.gesamt ? f.belegt / f.gesamt : 0;
     const farbe = f.belegt === 0 ? 'schlecht' : anteil < 0.4 ? 'gold' : 'gut';
     const teile = [];
-    if (f.fuellsel) teile.push(f.fuellsel + '× Füllsel');
+    if (f.fuellsel) teile.push(f.fuellsel + '× vorgefertigt');
     if (f.hinweise) teile.push(f.hinweise + '× Hinweis');
     kachel('Fassade', farbe, f.belegt + ' / ' + f.gesamt,
       echte + ' Botschaften' + (teile.length ? ' · ' + teile.join(' · ') : ''),
       f.belegt === 0
-        ? 'Nichts auf der Wand: läuft eine Runde? Ist etwas freigegeben? Sonst Füllsel einschalten.'
+        ? 'Nichts auf der Wand: läuft eine Runde? Ist etwas freigegeben? Sonst vorgefertigte Texte einschalten.'
         : 'Belegte Flächen von 33.');
   }
 
@@ -274,7 +274,7 @@ function zeichnen () {
     const auffaellig = s.nachschub === false || s.einrichtung === true;
     el('kSchalter').className = 'kachel ' + (auffaellig ? 'schlecht' : 'gut');
     el('dSchalter').textContent = 'Standzeit ' + (stand.standzeitSekunden || '?') + ' s · '
-      + ((stand.fuellsel && stand.fuellsel.aktive) || 0) + ' Füllsel aktiv · '
+      + ((stand.fuellsel && stand.fuellsel.aktive) || 0) + ' vorgefertigte Texte aktiv · '
       + (stand.hinweiseScharf || 0) + ' Hinweise scharf';
     el('rSchalter').textContent = s.einrichtung === true
       ? 'Einrichtungsmodus läuft — die Fassade zeigt Flächennamen, keine Botschaften.'

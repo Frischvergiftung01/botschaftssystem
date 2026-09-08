@@ -210,6 +210,50 @@ async function balkenText (seite) {
     await seite.waitForTimeout(200);
   }
 
+  console.log('\nUnternavigation: der Weg zurueck');
+  {
+    const leiste = seite.locator('.seiten a');
+    pruefe('ganz links steht Moderation',
+      (await leiste.first().textContent()).trim() === 'Moderation',
+      await leiste.first().textContent());
+    pruefe('und faellt auf', (await leiste.first().getAttribute('class') || '').includes('zurueck'));
+    pruefe('ganz rechts steht der Monitor',
+      (await leiste.last().textContent()).trim() === 'Monitor',
+      await leiste.last().textContent());
+    pruefe('der Reiter heisst jetzt Vorgefertigte Texte',
+      /Vorgefertigte Texte/.test(await seite.locator('nav button[data-ansicht="fuellsel"]').textContent()));
+
+    // Eine Nebenseite ganzflaechig oeffnen und ueber den Knopf zurueckfinden.
+    await seite.click('.seiten a:has-text("Statusseite")');
+    await seite.waitForFunction(() => !document.getElementById('rahmen').hidden);
+    pruefe('die Nebenseite deckt die Moderation zu',
+      await seite.locator('main').isHidden());
+    await seite.click('.seiten a.zurueck');
+    await seite.waitForFunction(() => document.getElementById('rahmen').hidden);
+    pruefe('der Knopf bringt die Warteschlange zurueck', await seite.locator('main').isVisible());
+    pruefe('und zwar in der Uebersicht', await seite.locator('#raster').isVisible());
+
+    // Der Simulator im eigenen Fenster geht wirklich in ein eigenes Fenster —
+    // sonst laege er wieder im Rahmen, und der zweite Monitor bliebe leer.
+    const [fenster] = await Promise.all([
+      seite.context().waitForEvent('page'),
+      seite.click('.seiten a:has-text("Simulator im eigenen Fenster")')
+    ]);
+    await fenster.waitForLoadState('domcontentloaded');
+    pruefe('er oeffnet ein eigenes Fenster', /\/simulator/.test(fenster.url()), fenster.url());
+    pruefe('und die Moderation bleibt, wo sie war', await seite.locator('main').isVisible());
+    await fenster.close();
+
+    // Der Simulator "unten" laeuft dagegen weiter mit.
+    await seite.click('.seiten a:has-text("Simulator") >> nth=0');
+    await seite.waitForFunction(() => !document.getElementById('rahmen').hidden);
+    pruefe('der mitlaufende Simulator laesst die Moderation stehen',
+      await seite.locator('main').isVisible() &&
+      (await seite.locator('#rahmen').getAttribute('class') || '').includes('unten'));
+    await seite.click('#rahmenZu');
+    await seite.waitForFunction(() => document.getElementById('rahmen').hidden);
+  }
+
   console.log('\nFuellsel: Plaetze bearbeiten und schalten');
   {
     await seite.click('nav button[data-ansicht="fuellsel"]');
