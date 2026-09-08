@@ -217,8 +217,9 @@ async function balkenText (seite) {
       (await leiste.first().textContent()).trim() === 'Moderation',
       await leiste.first().textContent());
     pruefe('und faellt auf', (await leiste.first().getAttribute('class') || '').includes('zurueck'));
-    pruefe('ganz rechts steht der Monitor',
-      (await leiste.last().textContent()).trim() === 'Monitor',
+    pruefe('der Monitor steht neben Gesundheit und geht ins eigene Fenster',
+      (await leiste.last().textContent()).trim() === 'Monitor im eigenen Fenster' &&
+      (await leiste.last().getAttribute('target')) === '_blank',
       await leiste.last().textContent());
     pruefe('der Reiter heisst jetzt Vorgefertigte Texte',
       /Vorgefertigte Texte/.test(await seite.locator('nav button[data-ansicht="fuellsel"]').textContent()));
