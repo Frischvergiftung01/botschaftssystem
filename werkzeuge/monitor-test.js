@@ -151,6 +151,51 @@ const klasse = (seite, w) => seite.locator(w).getAttribute('class');
       moderation.abend().eingegangen);
   }
 
+  console.log('\nAlles auf einen Schirm');
+  {
+    await seite.setViewportSize({ width: 1920, height: 1080 });
+    await seite.waitForTimeout(600);
+    const lage = await seite.evaluate(() => {
+      const kacheln = [...document.querySelectorAll('.kachel')];
+      const oben = kacheln.map(k => Math.round(k.getBoundingClientRect().top));
+      const rahmen = document.querySelector('.buehne iframe').getBoundingClientRect();
+      return {
+        anzahl: kacheln.length,
+        zeilen: new Set(oben).size,
+        scrollt: document.documentElement.scrollHeight > window.innerHeight + 2,
+        rahmenHoehe: Math.round(rahmen.height),
+        rahmenUnten: Math.round(rahmen.bottom),
+        fensterHoehe: window.innerHeight
+      };
+    });
+    pruefe('alle Kacheln stehen in EINER Zeile', lage.zeilen === 1,
+      lage.anzahl + ' Kacheln in ' + lage.zeilen + ' Zeilen');
+    pruefe('die Seite scrollt nicht', !lage.scrollt);
+    pruefe('darunter ist Platz für die Fassade', lage.rahmenHoehe > 250, lage.rahmenHoehe);
+    pruefe('und sie endet im Bild', lage.rahmenUnten <= lage.fensterHoehe + 2,
+      lage.rahmenUnten + ' von ' + lage.fensterHoehe);
+
+    const drin = seite.frameLocator('#simulator');
+    await drin.locator('#buehne').waitFor({ state: 'attached', timeout: 10000 });
+    pruefe('im Rahmen läuft der Simulator ohne Kopfzeile',
+      await drin.locator('header').isHidden(), 'Kopfzeile sichtbar');
+    const buehne = await seite.evaluate(() => {
+      const r = document.querySelector('.buehne iframe').contentDocument.getElementById('buehne');
+      return r ? Math.round(r.getBoundingClientRect().height) : 0;
+    });
+    pruefe('und die Fassade ist darin zu sehen', buehne > 80, buehne);
+
+    // Schmaler Schirm: dann darf und soll es umbrechen.
+    await seite.setViewportSize({ width: 900, height: 1000 });
+    await seite.waitForTimeout(400);
+    const schmal = await seite.evaluate(() => {
+      const oben = [...document.querySelectorAll('.kachel')].map(k => Math.round(k.getBoundingClientRect().top));
+      return new Set(oben).size;
+    });
+    pruefe('auf schmalen Schirmen bricht es um statt zu quetschen', schmal > 1, schmal);
+    await seite.setViewportSize({ width: 1920, height: 1080 });
+  }
+
   console.log('\nKonsole');
   {
     await seite.waitForTimeout(2500);   // zwei Abfragezyklen

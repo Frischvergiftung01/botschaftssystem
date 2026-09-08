@@ -36,9 +36,18 @@
     font-family:Oswald,"Arial Narrow",sans-serif;line-height:1;
     transition:opacity .35s linear;opacity:0}
   .fuss{color:var(--leise);font-size:.8rem;padding:10px 18px 24px;line-height:1.5}
+  /* Eingebettet (Monitorseite, ?nackt=1): nur die Fassade, ohne Kopf und
+     Erklaerung — dort steht der Zusammenhang schon daneben. */
+  body.nackt header, body.nackt .fuss{display:none}
+  body.nackt{display:flex;flex-direction:column;justify-content:center;height:100dvh;overflow:hidden}
+  body.nackt .buehne{max-height:100dvh}
 </style>
 </head>
 <body>
+<script>
+  // Ohne Kopfzeile laden, wenn die Seite in einem Rahmen steckt.
+  if (new URLSearchParams(location.search).has('nackt')) document.body.className = 'nackt';
+</script>
 <header>
   <h1>Flächen-Simulator</h1>
   <div class="zahlen">
