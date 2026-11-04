@@ -21,7 +21,7 @@
 // Scheduler kann ihn jederzeit fallen lassen und weitermachen wie bisher.
 
 const cfg = require('./config');
-const { FLAECHEN } = require('./flaechen');
+const { FLAECHEN, zoneVon } = require('./flaechen');
 const { groesseFuer } = require('./text');
 
 /**
@@ -103,6 +103,7 @@ function bauen (lage) {
   // Botschaften bis dahin vergeben, und die Zähler zählen es mit.
   const schonGezeigt = new Map();     // botschaftId -> wie oft im Plan gebucht
   const zuletztGebucht = new Map();   // botschaftId -> spätester Start
+  const gebuchteZone = new Map();     // botschaftId -> Zone ihrer Buchungen
   let letzterGebuchterWechsel = -Infinity;
   const spaetesteJeFlaeche = new Map();
   for (const e of (lage.gebucht || [])) {
@@ -113,6 +114,7 @@ function bauen (lage) {
       belegtBis.set(e.botschaftId, Math.max(belegtBis.get(e.botschaftId) || 0, e.ende));
       schonGezeigt.set(e.botschaftId, (schonGezeigt.get(e.botschaftId) || 0) + 1);
       zuletztGebucht.set(e.botschaftId, Math.max(zuletztGebucht.get(e.botschaftId) || 0, e.start));
+      if (!gebuchteZone.has(e.botschaftId)) gebuchteZone.set(e.botschaftId, zoneVon(e.flaeche));
     }
     if (e.hinweisId !== null) {
       schonGezeigt.set('h' + e.hinweisId, (schonGezeigt.get('h' + e.hinweisId) || 0) + 1);
@@ -138,7 +140,10 @@ function bauen (lage) {
     // Mindestvorlauf: noch nie gezeigt heisst, fruehestens so lange nach der
     // Freigabe. Ist sie schon gebucht, liegt jede weitere Buchung ohnehin spaeter.
     ab: (b.anzahl_anzeigen || 0) > 0 ? 0
-      : (b.entschieden_am || b.erstellt_am || 0) + (lage.vorlaufMs || 0)
+      : (b.entschieden_am || b.erstellt_am || 0) + (lage.vorlaufMs || 0),
+    // Zone: wo sie zum ersten Mal stand, sonst wo sie schon gebucht ist, sonst
+    // noch offen — dann legt die erste Buchung sie fest.
+    zone: (b.erste_flaeche ? zoneVon(b.erste_flaeche) : null) || gebuchteZone.get(b.id) || null
   })).sort(vorne);
 
   const durchsagen = (lage.hinweise || []).map(h => ({
@@ -180,13 +185,14 @@ function bauen (lage) {
       for (let i = 0; i < vorrat.length; i++) {
         const b = vorrat[i];
         if (t < b.ab) continue;                            // Mindestvorlauf noch nicht um
+        if (b.zone && b.zone !== f.zone) continue;         // Wiederholung nur in ihrer Zone
         if ((belegtBis.get(b.id) || 0) > t) continue;      // steht gerade woanders
         if (b.id === zuletztDort.get(nr)) continue;        // nicht direkt wiederholen
         const g = mass(b.text, f.breite);
         if (g.versalhoehe < cfg.minVersalhoehe) continue;  // hier nicht lesbar
         gebucht = { botschaftId: b.id, hinweisId: null, text: b.text, g };
         vorrat.splice(i, 1);
-        einsortieren(vorrat, { ...b, anzahl: b.anzahl + 1, zuletzt: t });
+        einsortieren(vorrat, { ...b, anzahl: b.anzahl + 1, zuletzt: t, zone: b.zone || f.zone });
         zuletztDort.set(nr, b.id);
         break;
       }
@@ -204,6 +210,7 @@ function bauen (lage) {
       flaeche: nr,
       flaecheName: f.name,
       gruppe: f.gruppe,
+      zone: f.zone,
       start: t,
       ende,
       botschaftId: gebucht.botschaftId,

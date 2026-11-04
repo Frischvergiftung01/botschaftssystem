@@ -119,7 +119,10 @@ const abfragen = {
   perToken: db.prepare('SELECT * FROM botschaften WHERE token = ?'),
   perId: db.prepare('SELECT * FROM botschaften WHERE id = ?'),
   letzteVomGeraet: db.prepare('SELECT erstellt_am FROM botschaften WHERE geraet = ? ORDER BY erstellt_am DESC LIMIT 1'),
-  spielbar: db.prepare(`SELECT * FROM botschaften WHERE status = 'freigegeben'
+  // erste_flaeche: wo die Botschaft zum ersten Mal stand — daraus ihre Zone.
+  spielbar: db.prepare(`SELECT *, (SELECT a.flaeche FROM anzeigen a WHERE a.botschaft_id = botschaften.id
+                                   ORDER BY a.start ASC LIMIT 1) AS erste_flaeche
+                        FROM botschaften WHERE status = 'freigegeben'
                         ORDER BY anzahl_anzeigen ASC, COALESCE(zuletzt_gezeigt, 0) ASC, erstellt_am ASC
                         LIMIT 400`),
   anzeigeEintragen: db.prepare(`INSERT INTO anzeigen (botschaft_id, flaeche, start, ende, versalhoehe, schrifthoehe, y_versatz)

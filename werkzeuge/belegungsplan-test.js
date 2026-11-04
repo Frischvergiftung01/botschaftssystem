@@ -120,7 +120,9 @@ console.log('\nDer Vorrat kommt reihum dran');
   const zahlen = [...wie_oft.values()];
   const min = Math.min(...zahlen), max = Math.max(...zahlen);
   pruefe('alle 120 waren dran', wie_oft.size === 120, wie_oft.size);
-  pruefe('höchstens einmal Unterschied', max - min <= 1, { min, max });
+  // Seit den Zonen (04.11.2026) dreht jede Zone ihre eigene Runde: wer in
+  // einer volleren Zone steht, kommt etwas seltener dran. Zwei sind erlaubt.
+  pruefe('höchstens zweimal Unterschied', max - min <= 2, { min, max });
 }
 
 console.log('\nÄltere Botschaften zuerst');
@@ -320,6 +322,39 @@ console.log('\nMindestvorlauf: frisch Freigegebenes kommt nicht sofort');
   const wieder = plan.bauen({ zustand: leererZustand(), vorrat: [gezeigt], hinweise: [],
     jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 180000, vorlaufMs: 60000 });
   pruefe('schon Gezeigtes wartet nicht', erstes(wieder) - T0 < 5000, Math.round((erstes(wieder) - T0) / 1000) + ' s');
+}
+
+console.log('\nZonen: Wiederholungen bleiben, wo die Botschaft zuerst stand');
+{
+  const { zoneVon } = require('../src/flaechen');
+  // Wenig Vorrat, langer Horizont: jede Botschaft kommt viele Male dran.
+  const p = plan.bauen({ zustand: leererZustand(), vorrat: botschaften(40), hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 600000 });
+  const zonenJe = new Map();
+  for (const e of p.eintraege) {
+    if (e.botschaftId === null) continue;
+    if (!zonenJe.has(e.botschaftId)) zonenJe.set(e.botschaftId, new Set());
+    zonenJe.get(e.botschaftId).add(zoneVon(e.flaeche));
+  }
+  const gemischt = [...zonenJe].filter(([, z]) => z.size > 1).map(([id]) => id);
+  pruefe('jede Botschaft bleibt in einer Zone', gemischt.length === 0, gemischt.slice(0, 5));
+  const oft = [...zonenJe.keys()].filter(id => p.eintraege.filter(e => e.botschaftId === id).length >= 3);
+  pruefe('und sie wiederholt sich dort', oft.length > 20, oft.length);
+  const verteilt = new Set([...zonenJe.values()].map(z => [...z][0]));
+  pruefe('alle drei Zonen bekommen Botschaften', verteilt.size === 3, [...verteilt]);
+  const belegt = new Set(p.eintraege.map(e => e.flaeche));
+  pruefe('alle 33 Flaechen werden belegt', belegt.size === FLAECHEN.length, belegt.size);
+
+  // Schon einmal gezeigt: ihre Zone steht fest, auch in einem frischen Plan.
+  const vorrat = botschaften(40).map(b => b.id === 5
+    ? { ...b, anzahl_anzeigen: 1, zuletzt_gezeigt: T0 - 60000, erste_flaeche: 12 }   // linke Kolonnade
+    : b);
+  const q = plan.bauen({ zustand: leererZustand(), vorrat, hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 600000 });
+  const ihre = q.eintraege.filter(e => e.botschaftId === 5);
+  pruefe('Botschaft 5 kommt wieder', ihre.length > 0, ihre.length);
+  pruefe('und zwar nur links', ihre.every(e => zoneVon(e.flaeche) === 'links'), ihre.map(e => e.flaeche));
+  pruefe('der Eintrag nennt die Zone', ihre.every(e => e.zone === 'links'));
 }
 
 console.log('\nStreichen nach einem Moderationseingriff');

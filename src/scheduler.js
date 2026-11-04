@@ -23,7 +23,7 @@
 // Wand, und an Probetagen will man die Zeiten nicht pflegen müssen.
 
 const cfg = require('./config');
-const { FLAECHEN } = require('./flaechen');
+const { FLAECHEN, zoneVon } = require('./flaechen');
 const { groesseFuer } = require('./text');
 const { abfragen } = require('./db');
 const einstellungen = require('./einstellungen');
@@ -171,9 +171,15 @@ function belegen (f, t) {
   if (kandidaten.length === 0) return fuellselVersuchen(f, t);
 
   const laufendeIds = new Set([...zustand.values()].filter(x => x.nr !== f.nr && x.ende > t).map(x => x.botschaftId));
+  const hier = zoneVon(f.nr);
+  const geplanteZone = planZonen();
 
   for (const b of kandidaten) {
     if (!vorlaufUm(b, t)) continue;                 // frisch freigegeben: noch nicht
+    // Wiederholungen bleiben in der Zone des ersten Auftritts — oder der Zone,
+    // die der Plan dem Absender schon angesagt hat.
+    const zone = (b.erste_flaeche ? zoneVon(b.erste_flaeche) : null) || geplanteZone.get(b.id) || null;
+    if (zone && zone !== hier) continue;
     if (laufendeIds.has(b.id)) continue;           // nicht zweimal gleichzeitig an der Fassade
     if (b.id === f.botschaftId) continue;          // nicht direkt wiederholen
     const voll = vollerText(b);
@@ -338,6 +344,16 @@ function raeumen (f) {
   f.start = 0;
   f.ende = 0;
   f.groesse = null;
+}
+
+/** Botschaft -> Zone, wie sie im Plan gebucht ist. */
+function planZonen () {
+  const m = new Map();
+  if (!plan) return m;
+  for (const e of plan.eintraege) {
+    if (e.botschaftId !== null && !m.has(e.botschaftId)) m.set(e.botschaftId, zoneVon(e.flaeche));
+  }
+  return m;
 }
 
 /**

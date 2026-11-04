@@ -41,6 +41,27 @@ saeulen(17, 'Mitte', 10, 3616, [2836, 3054, 3270, 3492, 3706, 3928, 4148, 4362, 
 saeulen(27, 'Rechts', 7, 5960, [6013, 6231, 6447, 6669, 6883, 7105, 7325]);
 
 /**
+ * Drei Zonen zu je 11 Flaechen (Entscheidung 04.11.2026). Wo eine Botschaft
+ * zum ersten Mal erscheint, legt ihre Zone fest — alle Wiederholungen bleiben
+ * dort. Wer am angesagten Ort stehen bleibt, sieht sie also wieder.
+ *   links:  Fluegel-Stirn, Kolonnade links, Portal-Stirn und -Saeulen links
+ *   mitte:  Stirn Mitte, Kolonnade Mitte
+ *   rechts: spiegelbildlich zu links
+ */
+const ZONEN = {
+  links:  { name: 'linker Teil',  beschreibung: 'linker Flügel bis linkes Portal' },
+  mitte:  { name: 'Mitte',        beschreibung: 'mittlere Kolonnade und Stirn über dem Mitteleingang' },
+  rechts: { name: 'rechter Teil', beschreibung: 'rechtes Portal bis rechter Flügel' }
+};
+const ZONE_JE_NR = { 1: 'mitte', 2: 'links', 3: 'rechts', 4: 'links', 5: 'rechts',
+  6: 'links', 7: 'links', 8: 'rechts', 9: 'rechts' };
+for (const f of FLAECHEN) f.zone = ZONE_JE_NR[f.nr] || f.gruppe;   // Kolonnaden: links/mitte/rechts
+
+const ZONE_NACH_NR = new Map(FLAECHEN.map(f => [f.nr, f.zone]));
+/** Zone einer Flaeche, oder null fuer eine unbekannte Nummer. */
+function zoneVon (nr) { return ZONE_NACH_NR.get(Number(nr)) || null; }
+
+/**
  * Wo am Gebäude ist das — in Worten, die jemandem helfen, der davorsteht.
  *
  * "Säule Mitte 04" ist ein Name für die Technik. Wer auf dem Vorplatz steht
@@ -87,4 +108,4 @@ function einrichtungName (f) {
   return `${nr} ${f.name.replace(/^Säule /, '')}`;
 }
 
-module.exports = { FLAECHEN, BANDHOEHE, ortsangabe, einrichtungName };
+module.exports = { FLAECHEN, BANDHOEHE, ZONEN, zoneVon, ortsangabe, einrichtungName };
