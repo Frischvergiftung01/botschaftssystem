@@ -24,8 +24,8 @@
   textarea,input{width:100%;background:var(--feld);color:var(--text);border:1px solid var(--rand);
     border-radius:14px;padding:14px;font:inherit;font-size:1.05rem;resize:none}
   textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
-  .spielregeln{background:#12161e;border:1px solid var(--rand);border-radius:14px;
-    padding:12px 14px;font-size:.88rem;line-height:1.5;color:var(--leise)}
+  /* Ohne Kasten, wie die Unterzeile — das Eingabefeld soll das einzige Feld sein. */
+  .spielregeln{font-size:.88rem;line-height:1.5;color:var(--leise);text-align:center}
   .spielregeln b{color:var(--text);font-weight:600}
   .zaehler{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
     font-size:.85rem;color:var(--leise);margin-top:8px}
@@ -37,6 +37,8 @@
   button:disabled{opacity:.45;cursor:default}
   .fehler{color:var(--warn);font-size:.9rem;min-height:1.2em;margin:0}
   footer{max-width:520px;color:#6b748b;font-size:.78rem;text-align:center;line-height:1.5;margin-top:auto}
+  .marke{margin-top:14px}
+  .marke a{color:var(--leise);font-weight:600;letter-spacing:.03em;text-decoration:none}
   .vorschau{border:1px solid var(--rand);border-radius:14px;padding:10px 12px;background:#0a0c11}
   .rueckkehr{display:block;width:100%;max-width:520px;text-align:center;color:var(--gold);
     background:#12161e;border:1px solid var(--rand);border-radius:14px;padding:11px 14px;
@@ -49,7 +51,7 @@
 </head>
 <body>
 <header>
-  <h1>Schick deine Botschaft an den Königsbau</h1>
+  <h1>Schick deine Botschaft auf den Königsbau</h1>
   <p class="unterzeile">Sie erscheint im Laufe des Abends auf der Fassade.</p>
 </header>
 
@@ -59,7 +61,7 @@
   <div class="spielregeln">
     Grüße, Glückwünsche, Liebeserklärungen — alles gern. Jede Botschaft wird vorher gelesen;
     Beleidigendes, Werbung und Politisches zeigen wir nicht.<br>
-    <b>Kurz ist am schönsten:</b> bis etwa 35 Zeichen passt eine Botschaft auf alle 33 Flächen.
+    <b>Kurz ist am schönsten:</b> bis etwa 35 Zeichen passt eine Botschaft auf alle Flächen.
     Längere passen nur auf die wenigen breiten und erscheinen deshalb seltener.
   </div>
 
@@ -95,6 +97,10 @@
   niemand im Sekundentakt schreibt, merken wir uns eine anonyme Prüfsumme deines Geräts.<br>
   <a href="/datenschutz" style="color:inherit">Datenschutz</a> ·
   <a href="/impressum" style="color:inherit">Impressum</a>
+  <div class="marke">
+    <a href="https://www.frischvergiftung.de/resonanz" target="_blank" rel="noopener">RESONANZ by Frischvergiftung</a><br>
+    Das smarte Botschaftssystem für Events
+  </div>
 </footer>
 
 <script>
