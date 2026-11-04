@@ -247,9 +247,8 @@ function zeichnen (d) {
     el('ueberschrift').textContent = 'Deine Botschaft erscheint in ca. '
       + dauer(Math.floor(d.gebucht.inSekunden / 10) * 10) + ' Min.';
     el('kernaussage').textContent = d.gebucht.ort;
-    el('erklaerung').textContent = d.gebucht.inSekunden <= 180
-      ? 'Genug Zeit, um hinzugehen. Die Seite meldet sich, wenn es so weit ist.'
-      : 'Der Platz steht fest. Die Seite zählt für dich herunter.';
+    // Kein Erklaertext: Ort und Countdown sprechen fuer sich (04.11.2026).
+    el('erklaerung').textContent = '';
     return planen(d.gebucht.inSekunden <= 60 ? 3000 : 10000);
   }
 
