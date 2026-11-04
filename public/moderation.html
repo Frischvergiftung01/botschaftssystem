@@ -132,9 +132,11 @@
   .buehne{position:relative;background:#000;border:1px solid var(--rand);border-radius:4px;overflow:hidden;width:100%}
   .buehne span{position:absolute;white-space:nowrap;color:#fff;line-height:1;
     font-family:Oswald,"Arial Narrow",sans-serif}
-  .unsicher .buehne{border-color:var(--unsicher);box-shadow:0 0 0 2px rgba(255,91,74,.35)}
+  .zeile.unsicher .buehne{border-color:var(--unsicher);box-shadow:0 0 0 2px rgba(255,91,74,.35)}
 
   .karte{background:var(--feld);border:1px solid var(--rand);border-radius:14px;padding:14px}
+  /* Grenzfall: der Rahmen geht um die ganze Karte, nicht nur um den Text. */
+  .karte.unsicher{border:2px solid var(--unsicher);box-shadow:0 0 0 3px rgba(255,91,74,.25)}
   .kopfzeile{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;color:var(--leise);font-size:.82rem;margin-bottom:10px}
   .kopfzeile .marker{color:var(--unsicher);font-weight:650}
   .roh{font-size:1.05rem;margin:12px 0 6px;line-height:1.4;word-break:break-word}
@@ -537,7 +539,9 @@ async function laden (frisch) {
     if (r1.status === 401 || r2.status === 401) { location.href = '/moderation/anmelden'; return; }
     const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
     stand = d1.kennzahlen;
-    vorrat = d1.botschaften;
+    // Unten stehen in der Übersicht nur Grenzfälle. Unauffällige gehören ins
+    // Raster oben — sonst stand dieselbe Botschaft doppelt da.
+    vorrat = d1.botschaften.filter(b => b.unsicher);
     rasterVorrat = d2.botschaften.slice(0, stand.rasterGroesse || 12);
     if (frisch) raus = new Set();
     zahlenZeichnen();
@@ -723,6 +727,10 @@ function zeichnenEinzeln () {
   const ziel = el('einzeln');
   const item = vorrat[0];
   ziel.innerHTML = '';
+  if (!item && ansicht === 'uebersicht') {
+    ziel.innerHTML = '<div class="leer">Keine Grenzfälle — oben weitermachen.</div>';
+    return;
+  }
   if (!item) {
     ziel.innerHTML = '<div class="leer">Keine offenen Botschaften.<br>' +
       (stand.schalter && stand.schalter.autoFreigabe
