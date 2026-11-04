@@ -29,6 +29,13 @@
   /* Lebt die Bridge? Am Abend die zweite Frage nach "wie viel liegt an". */
   .zahlen .fassade b.laeuft{color:var(--gut)}
   .zahlen .fassade b.still{color:var(--unsicher)}
+  /* Mistral: gruen laeuft, gelb ueberlastet, rot Fehler, grau aus */
+  .zahlen .mistral b::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;
+    margin-right:5px;vertical-align:1px;background:currentColor}
+  .zahlen .mistral b.gut{color:var(--gut)}
+  .zahlen .mistral b.knapp{color:var(--gold)}
+  .zahlen .mistral b.fehler{color:var(--unsicher)}
+  .zahlen .mistral b.aus{color:var(--leise)}
   .rechts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
   .pille{background:var(--feld);color:var(--text);border:1px solid var(--rand);border-radius:999px;
     padding:6px 12px;font:inherit;font-size:.82rem;cursor:pointer;white-space:nowrap}
@@ -203,8 +210,11 @@
     <span>offen <b id="zOffen">–</b></span>
     <span>letzte 5 min <b id="z5">–</b></span>
     <span>Durchsatz <b id="zDurchsatz">–</b>/h</span>
-    <span class="hinweise" id="zHinweiseFeld" hidden>Hinweise <b id="zHinweise">–</b></span>
+    <span title="Freigegebene Botschaften, die die Wand im Wechsel zeigt">im Umlauf <b id="zUmlauf">–</b></span>
+    <span title="Wie oft insgesamt eine Botschaft an der Wand stand, Wiederholungen mitgezählt">Einblendungen <b id="zEinblendungen">–</b></span>
+    <span class="hinweise" id="zHinweiseFeld" hidden title="Scharfe Hinweis-Plätze auf der Stirn Mitte">Hinweise auf Wand <b id="zHinweise">–</b></span>
     <span class="fassade" title="Meldet sich die Bridge auf dem Medien-PC?">Fassade <b id="zFassade">–</b></span>
+    <span class="mistral" id="zMistralFeld" title="Stufe 1b: prüft jede Botschaft mit dem Sprachmodell">Mistral <b id="zMistral">–</b></span>
   </div>
   <div class="rechts">
     <button class="pille" id="sAuto">Auto-Freigabe</button>
@@ -592,14 +602,20 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  // Beschriftung = was der Klick tut (04.11.2026); die Farbe zeigt den Stand.
   const h = stand.schalter.hinweise === true;
-  el('sHinweise').textContent = 'Hinweise ' + (h ? 'an' : 'aus');
+  el('sHinweise').textContent = h ? 'Hinweise ausschalten' : 'Hinweise einschalten';
   el('sHinweise').className = 'pille ' + (h ? 'an' : 'aus');
   el('hinweiseAusVermerk').hidden = h;
   const fs = stand.schalter.fuellsel === true;
-  el('sFuellsel').textContent = 'Vorgefertigte Texte ' + (fs ? 'an' : 'aus');
+  el('sFuellsel').textContent = fs ? 'Vorgefertigte Texte ausschalten' : 'Vorgefertigte Texte einschalten';
   el('sFuellsel').className = 'pille ' + (fs ? 'an' : 'aus');
   el('fuellselAusVermerk').hidden = fs;
+  if (stand.abend) {
+    el('zUmlauf').textContent = stand.abend.freigegeben.toLocaleString('de-DE');
+    el('zEinblendungen').textContent = stand.abend.einblendungen.toLocaleString('de-DE');
+  }
+  mistralZeichnen(stand.stufe1b);
   fassadeZeichnen();
   const ein = stand.schalter.einrichtung === true;
   el('einrichtungsbalken').hidden = !ein;
@@ -620,8 +636,34 @@ function zahlenZeichnen () {
   // Eine belegte Stirnseite Mitte gehoert in den Kopf: sonst wundert man sich,
   // warum die breiteste Flaeche keine Botschaften mehr zeigt.
   const scharfe = stand.hinweiseScharf || 0;
-  el('zHinweiseFeld').hidden = scharfe === 0;
+  // Nur, wenn Hinweise auch wirklich an die Wand duerfen.
+  el('zHinweiseFeld').hidden = scharfe === 0 || !h;
   el('zHinweise').textContent = scharfe;
+}
+
+/**
+ * Mistral-Zustand aus den Zaehlern, die ohnehin alle 5 s mitkommen. Die Zaehler
+ * laufen seit dem Start hoch; was zaehlt, ist ob sie in der letzten Minute
+ * gestiegen sind. Kein eigener Abruf.
+ */
+const mistralVerlauf = [];   // [{zeit, ueberlastet, stoerung}]
+function mistralZeichnen (m) {
+  const feld = el('zMistral');
+  if (!m) return;
+  if (!m.aktiv) { feld.className = 'aus'; feld.textContent = 'aus'; return; }
+  const jetzt = Date.now();
+  const stoerung = (m.timeout || 0) + (m.fehler || 0);
+  mistralVerlauf.push({ zeit: jetzt, ueberlastet: m.ueberlastet || 0, stoerung });
+  while (mistralVerlauf.length && jetzt - mistralVerlauf[0].zeit > 60000) mistralVerlauf.shift();
+  const erst = mistralVerlauf[0];
+  if (stoerung > erst.stoerung) {
+    feld.className = 'fehler'; feld.textContent = 'Fehler';
+  } else if ((m.ueberlastet || 0) > erst.ueberlastet) {
+    feld.className = 'knapp'; feld.textContent = 'überlastet';
+  } else {
+    feld.className = 'gut';
+    feld.textContent = m.msSchnitt ? (m.msSchnitt / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' s' : 'bereit';
+  }
 }
 
 /**
