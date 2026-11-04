@@ -602,13 +602,13 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
-  // Beschriftung = was der Klick tut (04.11.2026); die Farbe zeigt den Stand.
+  // Beschriftung als ganzer Satz zum Zustand (04.11.2026), Farbe wie gehabt.
   const h = stand.schalter.hinweise === true;
-  el('sHinweise').textContent = h ? 'Hinweise ausschalten' : 'Hinweise einschalten';
+  el('sHinweise').textContent = h ? 'Hinweise sind an' : 'Hinweise sind aus';
   el('sHinweise').className = 'pille ' + (h ? 'an' : 'aus');
   el('hinweiseAusVermerk').hidden = h;
   const fs = stand.schalter.fuellsel === true;
-  el('sFuellsel').textContent = fs ? 'Vorgefertigte Texte ausschalten' : 'Vorgefertigte Texte einschalten';
+  el('sFuellsel').textContent = fs ? 'Vorgefertigte Texte sind an' : 'Vorgefertigte Texte sind aus';
   el('sFuellsel').className = 'pille ' + (fs ? 'an' : 'aus');
   el('fuellselAusVermerk').hidden = fs;
   if (stand.abend) {
