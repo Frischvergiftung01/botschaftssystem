@@ -24,7 +24,10 @@ const SCHLUESSEL = {
   einrichtung: 'einrichtung',
   // `hinweise` aus heisst: scharfe Hinweise bleiben scharf, kommen aber nicht
   // an die Wand. Wiedereinschalten setzt genau dort fort.
-  hinweise: 'hinweise'
+  hinweise: 'hinweise',
+  // `fuellsel` (in der Oberflaeche "Vorgefertigte Texte") ebenso: aktive
+  // Plaetze bleiben aktiv, fuellen aber keine Luecken, solange er aus ist.
+  fuellsel: 'fuellsel'
 };
 const STANDZEIT = 'standzeit';
 const STANDZEIT_MIN = 5;
@@ -36,7 +39,10 @@ function vorgabe () {
     nachschub: true,                // teilt der Scheduler neue Botschaften zu?
     belegungsplan: true,            // wird im Voraus gebucht statt erst beim Wechsel?
     einrichtung: false,             // zeigt die Fassade ihre eigenen Flaechennamen?
-    hinweise: true                  // duerfen scharfe Hinweise an die Wand?
+    // Beide beginnen aus: was an eigenen Texten auf die Fassade geht, wird
+    // am Abend bewusst eingeschaltet.
+    hinweise: false,                // duerfen scharfe Hinweise an die Wand?
+    fuellsel: false                 // duerfen aktive vorgefertigte Texte Luecken fuellen?
   };
 }
 

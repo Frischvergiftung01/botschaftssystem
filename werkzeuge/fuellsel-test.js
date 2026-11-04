@@ -23,6 +23,7 @@ const { db, abfragen } = require('../src/db');
 const { FLAECHEN } = require('../src/flaechen');
 const scheduler = require('../src/scheduler');
 const fuellsel = require('../src/fuellsel');
+const einstellungen = require('../src/einstellungen');
 const moderation = require('../src/moderation');
 
 let fehler = 0;
@@ -54,11 +55,20 @@ const belegt = () => scheduler.anzeige().filter(f => f.text);
     pruefe('nichts freigegeben, nichts zu sehen', belegt().length === 0, belegt().length);
   }
 
-  console.log('\nMit Fuellsel fuellt sich die Luecke — bis zum Deckel');
+  console.log('\nAktive Plaetze, aber Schalter "Vorgefertigte Texte" aus (Startwert)');
   {
     fuellsel.aktivSetzen(1, true);
     fuellsel.aktivSetzen(2, true);
     fuellsel.aktivSetzen(3, true);
+    pruefe('der Schalter beginnt aus', einstellungen.schalter().fuellsel === false);
+    await takte(12);
+    pruefe('die Wand bleibt trotzdem leer', belegt().length === 0, belegt().length);
+    pruefe('die Plaetze bleiben aktiv', fuellsel.stand().aktive === 3, fuellsel.stand().aktive);
+  }
+
+  console.log('\nMit Fuellsel fuellt sich die Luecke — bis zum Deckel');
+  {
+    einstellungen.setzen('fuellsel', true);
     await takte(60);
     const f = belegt();
     pruefe('es steht etwas da', f.length > 0, f.length);

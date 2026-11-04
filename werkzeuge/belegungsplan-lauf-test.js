@@ -151,6 +151,7 @@ async function laufen (sekunden) {
   {
     hinweise.speichern([{ text: 'Letzte Runde um 22:30' }]);
     hinweise.scharfSetzen(1, true);
+    einstellungen.setzen('hinweise', true);   // Startwert ist aus
     scheduler.planFlaecheLeeren(cfg.hinweisFlaeche);
     // Nachziehen ist gedrosselt; einen Augenblick geben.
     await schlaf(1100);

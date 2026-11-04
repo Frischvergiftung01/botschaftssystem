@@ -68,6 +68,14 @@ for (let i = 0; i < 40; i++) {
   });
   keks = Array.isArray(an.headers['set-cookie']) ? an.headers['set-cookie'][0] : an.headers['set-cookie'];
 
+  console.log('\nDer Schalter "Hinweise" beginnt aus');
+  {
+    const k = (await ruf('/api/moderation/kennzahlen')).json();
+    pruefe('Startwert aus', k.schalter.hinweise === false, k.schalter);
+    const a = await ruf('/api/moderation/schalter', { name: 'hinweise', wert: true });
+    pruefe('fuer diesen Test eingeschaltet', a.json().schalter.hinweise === true, a.json());
+  }
+
   console.log('\nPlaetze stehen von selbst bereit');
   {
     const d = (await ruf('/api/moderation/hinweise')).json();

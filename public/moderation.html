@@ -206,6 +206,7 @@
     <button class="pille" id="sAuto">Auto-Freigabe</button>
     <button class="pille" id="sNachschub">Nachschub</button>
     <button class="pille" id="sHinweise">Hinweise</button>
+    <button class="pille" id="sFuellsel">Vorgefertigte Texte</button>
     <button class="pille" id="abmelden">Abmelden</button>
   </div>
 </header>
@@ -340,6 +341,9 @@
       dunkle Wand sieht aus, als warte sie auf Botschaften, eine volle sieht aus wie eine Werbetafel.<br>
       Diese Texte gehen durch keinen Filter, tauchen in keiner Queue auf und werden <b>nicht</b> in den
       Kennzahlen des Abends gezählt. Am Ende soll dastehen, was wirklich aus dem Publikum kam.</p>
+      <p class="fuss" id="fuellselAusVermerk" hidden style="color:var(--gold)"><b>Vorgefertigte Texte
+      sind oben ausgeschaltet.</b> Aktive Plätze bleiben aktiv, füllen aber erst wieder Lücken,
+      wenn „Vorgefertigte Texte“ oben wieder an ist.</p>
     </div>
     <div id="fuellselListe" style="margin-top:14px"></div>
     <div class="werkzeug">
@@ -480,6 +484,7 @@ async function start () {
   el('sAuto').addEventListener('click', () => schalten('autoFreigabe'));
   el('sNachschub').addEventListener('click', () => schalten('nachschub'));
   el('sHinweise').addEventListener('click', () => schalten('hinweise'));
+  el('sFuellsel').addEventListener('click', () => schalten('fuellsel'));
   el('sPlan').addEventListener('click', () => schalten('belegungsplan'));
   el('sEinrichtung').addEventListener('click', () => schalten('einrichtung'));
   el('einrichtungAus').addEventListener('click', () => schalten('einrichtung'));
@@ -583,10 +588,14 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
-  const h = stand.schalter.hinweise !== false;
+  const h = stand.schalter.hinweise === true;
   el('sHinweise').textContent = 'Hinweise ' + (h ? 'an' : 'aus');
   el('sHinweise').className = 'pille ' + (h ? 'an' : 'aus');
   el('hinweiseAusVermerk').hidden = h;
+  const fs = stand.schalter.fuellsel === true;
+  el('sFuellsel').textContent = 'Vorgefertigte Texte ' + (fs ? 'an' : 'aus');
+  el('sFuellsel').className = 'pille ' + (fs ? 'an' : 'aus');
+  el('fuellselAusVermerk').hidden = fs;
   fassadeZeichnen();
   const ein = stand.schalter.einrichtung === true;
   el('einrichtungsbalken').hidden = !ein;
@@ -892,6 +901,8 @@ async function schalten (name) {
     nachschub: 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'),
     hinweise: 'Hinweise ' + (wert ? 'an — scharfe Plätze kommen beim nächsten Wechsel'
       : 'aus — ein laufender Hinweis steht noch zu Ende'),
+    fuellsel: 'Vorgefertigte Texte ' + (wert ? 'an — aktive Plätze füllen wieder Lücken'
+      : 'aus — was gerade steht, läuft aus'),
     belegungsplan: 'Belegungsplan ' + (wert ? 'an — Flächen werden wieder im Voraus gebucht' : 'aus — der Scheduler entscheidet erst beim Wechsel'),
     einrichtung: wert
       ? 'Einrichtungsmodus an — die Fassade zeigt Flächennamen'

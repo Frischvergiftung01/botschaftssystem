@@ -28,6 +28,7 @@
 const cfg = require('./config');
 const { db, abfragen } = require('./db');
 const { groesseFuer } = require('./text');
+const einstellungen = require('./einstellungen');
 
 // Vorschlaege fuer den Anfang. Kurz gehalten: sie sollen auch auf eine
 // Kolonnadensaeule (437 px) noch lesbar passen.
@@ -66,7 +67,9 @@ function sicherstellen () {
   return alle();
 }
 
+/** Aktiv UND der Schalter "Vorgefertigte Texte" oben ist an. */
 function aktive () {
+  if (!einstellungen.schalter().fuellsel) return [];
   return alle().filter(f => f.aktiv && f.text.trim());
 }
 
@@ -173,6 +176,7 @@ function stand () {
     maxZeichen: cfg.maxZeichenFuellsel,
     deckel: cfg.fuellselDeckel,
     aktive: zeilen.filter(z => z.aktiv).length,
+    eingeschaltet: einstellungen.schalter().fuellsel,   // Schalter oben in der Leiste
     zeilen
   };
 }

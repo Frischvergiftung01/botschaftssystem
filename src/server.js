@@ -335,7 +335,7 @@ fastify.post('/api/moderation/entscheiden', async (req, reply) => {
 
 fastify.post('/api/moderation/schalter', async (req, reply) => {
   const name = String(req.body?.name ?? '');
-  if (!['autoFreigabe', 'nachschub', 'belegungsplan', 'einrichtung', 'hinweise'].includes(name)) {
+  if (!['autoFreigabe', 'nachschub', 'belegungsplan', 'einrichtung', 'hinweise', 'fuellsel'].includes(name)) {
     return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
   }
   const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
