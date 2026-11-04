@@ -194,11 +194,6 @@ function dauer (sekunden) {
   return Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0');
 }
 
-/** Satz zur Zone: wo die Botschaft nach dem ersten Auftritt wiederkommt. */
-function wiederkommen (ort) {
-  return ort && ort.zone ? ` Danach kommt sie immer wieder ${ort.zone.imSatz}.` : '';
-}
-
 function zeichnen (d) {
   el('botschaft').textContent = d.text;
   const liste = eigene();
@@ -215,8 +210,7 @@ function zeichnen (d) {
     karte.classList.add('jetzt');
     el('ueberschrift').innerHTML = '<span class="punkt"></span>Gerade auf der Fassade';
     el('kernaussage').textContent = d.jetztAuf.ort || d.jetztAuf.name;
-    el('erklaerung').textContent = 'Schau hin! Sie steht noch ein paar Sekunden.'
-      + wiederkommen(d.jetztAuf);
+    el('erklaerung').textContent = 'Schau hin! Sie steht noch ein paar Sekunden.';
     el('balken').style.width = '100%';
     planZeigen(d.jetztAuf, true);
     return planen(3000);           // dicht dran: schnell nachfragen
@@ -236,9 +230,9 @@ function zeichnen (d) {
     }
     el('ueberschrift').textContent = 'In ' + dauer(d.gebucht.inSekunden);
     el('kernaussage').textContent = d.gebucht.ort;
-    el('erklaerung').textContent = (d.gebucht.inSekunden <= 180
+    el('erklaerung').textContent = d.gebucht.inSekunden <= 180
       ? 'Genug Zeit, um hinzugehen. Die Seite meldet sich, wenn es so weit ist.'
-      : 'Der Platz steht fest. Die Seite zählt für dich herunter.') + wiederkommen(d.gebucht);
+      : 'Der Platz steht fest. Die Seite zählt für dich herunter.';
     return planen(d.gebucht.inSekunden <= 60 ? 3000 : 10000);
   }
 
@@ -255,9 +249,7 @@ function zeichnen (d) {
   if (d.anzahlAnzeigen > 0) {
     el('ueberschrift').textContent = 'War schon zu sehen';
     el('kernaussage').textContent = d.zuletzt ? (d.zuletzt.ort || d.zuletzt.name) : 'auf der Fassade';
-    el('erklaerung').textContent = d.zuletzt && d.zuletzt.zone
-      ? `Bisher ${d.anzahlAnzeigen}× gezeigt. Sie kommt immer wieder ${d.zuletzt.zone.imSatz} (${d.zuletzt.zone.beschreibung}) — bleib dort, dann siehst du sie wieder.`
-      : `Bisher ${d.anzahlAnzeigen}× gezeigt — sie kommt im Lauf des Abends wieder.`;
+    el('erklaerung').textContent = `Bisher ${d.anzahlAnzeigen}× gezeigt — sie kommt im Lauf des Abends wieder.`;
     el('balken').style.width = '100%';
     return planen(20000);
   }
