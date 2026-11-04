@@ -798,8 +798,19 @@ function zeichnenRaster () {
   el('rasterStand').textContent = uebrig + ' von ' + rasterVorrat.length + ' würden freigegeben — Anklicken nimmt eine heraus.';
 }
 
+// Die Listen werden alle 10 s nachgeladen. Unveraendert wird nicht neu
+// gezeichnet, und sonst bleibt die Scrollposition stehen — vorher sprang die
+// Seite beim Leeren der Liste nach oben, mitten aus dem Lesen.
+let listenAbdruck = '';
+
 function zeichnenListe () {
   const ziel = el('liste');
+  const abdruck = ansicht + '|' + listenVorrat.map(b => b.id + ':' + (b.anzahlAnzeigen || 0)).join(',');
+  if (abdruck === listenAbdruck && ziel.childElementCount) return;
+  listenAbdruck = abdruck;
+  const scrollY = window.scrollY;
+  ziel.style.minHeight = ziel.offsetHeight + 'px';   // haelt die Hoehe, solange neu aufgebaut wird
+  requestAnimationFrame(() => { ziel.style.minHeight = ''; window.scrollTo(0, scrollY); });
   ziel.innerHTML = '';
   if (!listenVorrat.length) {
     ziel.innerHTML = '<div class="leer">Nichts vorhanden.</div>';
