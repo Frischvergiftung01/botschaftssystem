@@ -40,7 +40,10 @@ module.exports = {
     'sieg heil', 'heil hitler', 'hitlergruss', 'hitler', 'hakenkreuz',
     'blut und ehre', 'meine ehre heisst treue', 'auslaender raus',
     'deutschland den deutschen', 'volksverraeter', 'nsdap', 'umvolkung',
-    'holocaustluege', 'judenvergasung'
+    'holocaustluege', 'judenvergasung',
+    // Drogen (Entscheidung 04.11.2026: ablehnen, auch scherzhaft)
+    'drogen', 'kokain', 'koks', 'koksen', 'kiffen', 'kiffer', 'joint', 'cannabis',
+    'haschisch', 'heroin', 'crystal meth', 'mdma', 'ecstasy', 'lsd', 'weed', 'bubatz'
   ],
 
   // Auch ohne Wortgrenzen, gegen den zusammengezogenen Text. Nur lange,
@@ -91,7 +94,11 @@ module.exports = {
     'bayern', 'fcb', 'bvb', 'dortmund', 'schalke', 'hsv', 'ksc',
     'karlsruher', 'eintracht', 'hoffenheim', 'hertha', 'sechzig',
     // Richtlinie 4.5 / heikel
-    'suizid', 'selbstmord', 'ritzen', 'kokain', 'komasaufen', 'drogen'
+    'suizid', 'selbstmord', 'ritzen', 'komasaufen',
+    // Alkohol (Entscheidung 04.11.2026: immer Grenzfall, auch "Prost")
+    'alkohol', 'prost', 'bier', 'biere', 'betrunken', 'besoffen', 'saufen', 'sauf',
+    'schnaps', 'wodka', 'vodka', 'sekt', 'wein', 'gluehwein', 'cocktail', 'rausch',
+    'bierchen', 'promille'
   ],
 
   weichMuster: [

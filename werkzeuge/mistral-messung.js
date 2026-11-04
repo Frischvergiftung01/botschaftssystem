@@ -24,8 +24,9 @@ const FAELLE = [
   ['Willst du mich heiraten, Miriam?',                    'FREI'],
   ['Ruhe in Frieden, Papa. Wir vermissen dich',           'FREI'],
   ['Danke an alle, die heute hinter der Bühne stehen',    'FREI'],
-  ['Prost Stuttgart, was für ein Abend',                  'FREI'],
   ['Frieden',                                             'FREI'],
+  ['Viele Grüße an Frau Maier, beste Lehrerin',           'FREI'],
+  ['Herzliche Grüße an alle Nachbarn',                    'FREI'],
   ['VfB bis ich sterbe',                                  'FREI'],
   ['Danke an die Uni Hohenheim für fünf gute Jahre',      'FREI'],
   ['Bonjour Stuttgart, merci pour cette soirée',          'FREI'],
@@ -36,6 +37,11 @@ const FAELLE = [
   ['Kauft alle bei uns im Laden ein, beste Preise',       'ABLEHNEN'],
   ['Wer heute nicht feiert, ist ein Loser',               'ABLEHNEN'],
   ['Ich mach dich kalt, Kevin',                           'ABLEHNEN'],
+  ['Heute wird gekifft',                                  'ABLEHNEN'],
+  ['Wer hat noch Pillen für später?',                     'ABLEHNEN'],
+
+  ['Prost Stuttgart, was für ein Abend',                  'PRUEFEN'],
+  ['Ich bin so betrunken, ich weiß nicht mehr wo ich bin', 'PRUEFEN'],
 
   ['Rettet das Klima, bevor es zu spät ist',              'PRUEFEN'],
   // Strittig und deshalb mit zwei zulaessigen Urteilen: die Losung ist
