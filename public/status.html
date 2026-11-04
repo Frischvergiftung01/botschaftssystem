@@ -58,9 +58,11 @@
   .ausschnitt{aspect-ratio:64/30;margin-top:8px}
   .ausschnitt::before{background-size:300% 100%;background-position:var(--x,0) 0}
   /* Zeigt in der Übersicht, welcher Teil unten vergrößert ist. */
-  .lupe{position:absolute;top:0;bottom:0;border:1px solid rgba(255,207,107,.5);
-    border-radius:3px;background:rgba(255,207,107,.07);pointer-events:none}
-  .fassade.jetzt .lupe{border-color:rgba(126,224,168,.5);background:rgba(126,224,168,.07)}
+  /* Weiss, auch wenn die Botschaft gerade laeuft (04.11.2026). */
+  .lupe{position:absolute;top:0;bottom:0;border:1px solid rgba(255,255,255,.7);
+    border-radius:3px;background:rgba(255,255,255,.08);pointer-events:none}
+  /* Der Punkt steht nur im Ausschnitt — in der Uebersicht zeigt die Lupe den Bereich. */
+  .uebersicht .marke{display:none}
   /* Eine Säulenfläche ist 44 von 7680 breit — als Rechteck auf einem Handy
      wäre sie zwei Pixel schmal. Deshalb ein Punkt fester Größe auf ihrer
      Mitte: sichtbar, und die Stelle stimmt trotzdem. */
