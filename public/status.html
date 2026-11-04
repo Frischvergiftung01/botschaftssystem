@@ -206,6 +206,20 @@ function dauer (sekunden) {
   return Math.floor(v / 60) + ':' + String(v % 60).padStart(2, '0');
 }
 
+/**
+ * Die Runde (laufende oder naechste) reicht nicht. Freundlich und eindeutig,
+ * mit der Uhrzeit der Runde, in der sie voraussichtlich kommt. (04.11.2026)
+ */
+function rundeVoll (r) {
+  el('ueberschrift').textContent = 'Danke für deine Botschaft';
+  el('kernaussage').textContent = r.laufend ? 'Diese Runde ist leider voll' : 'Die nächste Runde ist leider voll';
+  el('erklaerung').textContent = r.keinPlatzMehr
+    ? 'Für heute ist leider kein Platz mehr frei.'
+    : 'Deine Botschaft kommt in einer späteren Runde' + (r.spaeterAb ? ', voraussichtlich ab ' + r.spaeterAb + ' Uhr.' : '.');
+  el('balken').style.width = '30%';
+  return planen(15000);
+}
+
 function zeichnen (d) {
   naechsteMoeglich = d.naechsteMoeglich !== false;
   sperreTicken();
@@ -285,7 +299,7 @@ function zeichnen (d) {
         el('erklaerung').textContent = `Kommt in der Runde ab ${r.beginn}.`
           + (r.frueh ? ' Deine Botschaft ist dann früh dabei.' : '');
       } else if (r) {
-        el('erklaerung').textContent = 'Kommt voraussichtlich in einer späteren Runde.';
+        return rundeVoll(r);
       } else {
         el('erklaerung').textContent = 'Kommt, sobald es weitergeht.';
       }
@@ -295,11 +309,7 @@ function zeichnen (d) {
     // Laufende Runde, aber der Rest reicht nicht: keine Minutenzahl, die am
     // Rundenende ins Leere laeuft (04.11.2026).
     if (d.naechsteRunde && d.naechsteRunde.laufend && !d.naechsteRunde.passt) {
-      el('ueberschrift').textContent = 'Freigegeben';
-      el('kernaussage').textContent = `${d.vorDir} Botschaften vor dir`;
-      el('erklaerung').textContent = 'Diese Runde ist voll — deine Botschaft kommt voraussichtlich in einer späteren Runde.';
-      el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
-      return planen(15000);
+      return rundeVoll(d.naechsteRunde);
     }
     const min = Math.max(1, Math.round(d.geschaetzteWartezeitSekunden / 60));
     el('ueberschrift').textContent = 'Freigegeben';

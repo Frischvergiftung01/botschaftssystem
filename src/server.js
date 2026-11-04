@@ -222,24 +222,49 @@ function naechsteRundeSchaetzen (b, vorDir, jetzt) {
   const s = sessionen.stand(jetzt);
   const standzeitMs = einstellungen.standzeit() * 1000;
   const flaechen = passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length;
-  // Laufende Runde: reicht der restliche Nachschub fuer alle vor ihr?
+  /** Erstauftritte, die eine Runde fuer diesen Text hergibt. */
+  const plaetzeVon = (startMs, endeMs) => {
+    const laengeMs = endeMs - Math.max(startMs, jetzt);
+    return flaechen * Math.max(0, Math.floor((laengeMs - standzeitMs) / standzeitMs) + 1);
+  };
+
+  // Die Runde, um die es zuerst geht: die laufende oder die naechste.
+  let laufend, plaetze, beginn = null;
   if (s.phase === 'laeuft' && s.aktuell) {
-    const wechsel = Math.max(0, Math.floor((s.aktuell.nachschubBis - jetzt) / standzeitMs));
-    const plaetze = flaechen * wechsel;
-    return { laufend: true, plaetze, passt: vorDir < plaetze };
+    laufend = true;
+    plaetze = flaechen * Math.max(0, Math.floor((s.aktuell.nachschubBis - jetzt) / standzeitMs));
+  } else if (s.kommend) {
+    laufend = false;
+    beginn = s.kommend.geplantStart;
+    plaetze = plaetzeVon(s.kommend.startStempel, s.kommend.endeStempel);
+  } else {
+    return null;
   }
-  // Pause oder Auslaufen: die naechste Runde.
-  if (!s.kommend) return null;
-  const laengeMs = s.kommend.endeStempel - Math.max(s.kommend.startStempel, jetzt);
-  const wechsel = Math.max(0, Math.floor((laengeMs - standzeitMs) / standzeitMs) + 1);
-  const plaetze = flaechen * wechsel;
-  return {
-    laufend: false,
-    beginn: s.kommend.geplantStart,
-    plaetze,
-    passt: vorDir < plaetze,
+  if (vorDir < plaetze) {
     // "frueh dabei" nur, wenn sie im ersten Drittel der Runde drankommt
-    frueh: vorDir < plaetze / 3
+    return { laufend, beginn, plaetze, passt: true, frueh: vorDir < plaetze / 3 };
+  }
+
+  // Passt nicht: in welcher der folgenden Runden voraussichtlich? Die noch
+  // nicht gezeigten kommen vor allen Wiederholungen, also wird einfach weiter
+  // aufaddiert, bis der Platz reicht. (04.11.2026)
+  let rest = vorDir - plaetze;
+  const folgende = s.zeilen.filter(z => !z.gelaufen && !z.verpasst && !z.abgebrochen &&
+    !(s.kommend && !laufend && z.nr === s.kommend.nr));
+  let spaeterAb = null;
+  for (const z of folgende) {
+    const start = sessionen.heuteUm(sessionen.ausUhrzeit(z.geplantStart), jetzt);
+    const ende = sessionen.heuteUm(sessionen.ausUhrzeit(z.geplantEnde), jetzt);
+    if (start <= jetzt) continue;
+    const p = plaetzeVon(start, ende);
+    if (rest < p) { spaeterAb = z.geplantStart; break; }
+    rest -= p;
+  }
+  return {
+    laufend, beginn, plaetze, passt: false, frueh: false,
+    spaeterAb,
+    // Keine eingetragene Runde reicht mehr — heute wird es nichts.
+    keinPlatzMehr: spaeterAb === null
   };
 }
 
