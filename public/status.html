@@ -211,6 +211,16 @@ function dauer (sekunden) {
  * mit der Uhrzeit der Runde, in der sie voraussichtlich kommt. (04.11.2026)
  */
 function rundeVoll (r) {
+  if (r.keinPlatzMehr) {
+    // Wortlaut vom 04.11.2026
+    el('ueberschrift').textContent = 'Vielen Dank für deine Botschaft und das Mitmachen';
+    el('kernaussage').textContent = '';
+    el('erklaerung').textContent = 'Uns haben so viele Botschaften erreicht, dass wir heute nicht mehr alle '
+      + 'zeigen können. Deine gehört leider auch dazu. Wir hoffen auf dein Verständnis und wünschen dir '
+      + 'natürlich trotzdem noch einen schönen Abend.';
+    el('balken').style.width = '0';
+    return planen(60000);
+  }
   el('ueberschrift').textContent = 'Danke für deine Botschaft';
   el('kernaussage').textContent = r.laufend ? 'Diese Runde ist leider voll' : 'Die nächste Runde ist leider voll';
   el('erklaerung').textContent = r.keinPlatzMehr
