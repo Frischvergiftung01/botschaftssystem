@@ -290,8 +290,11 @@ function zeichnen (d) {
 
   if (d.anzahlAnzeigen > 0) {
     el('ueberschrift').textContent = 'War schon zu sehen';
-    el('kernaussage').textContent = d.zuletzt ? (d.zuletzt.ort || d.zuletzt.name) : 'auf der Fassade';
-    el('erklaerung').textContent = `Bisher ${d.anzahlAnzeigen}× gezeigt — sie kommt im Lauf des Abends wieder.`;
+    // Ohne Ort: wo sie stand, ist danach uninteressant. Wiederkommen ist nicht
+    // garantiert, also nicht versprechen (04.11.2026).
+    el('kernaussage').textContent = `Bisher ${d.anzahlAnzeigen}× gezeigt`;
+    el('erklaerung').textContent = 'Eventuell kommt sie im Laufe des Abends wieder — abhängig davon, '
+      + 'wie viele Botschaften uns insgesamt erreichen.';
     el('balken').style.width = '100%';
     return planen(20000);
   }
