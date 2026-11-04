@@ -153,11 +153,13 @@
     border:1px solid var(--rand);font-weight:500;font-size:.9rem;padding:16px 14px}
 
   #raster .kacheln{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
-  .kachel{background:var(--feld);border:1px solid var(--rand);border-radius:12px;padding:10px;cursor:pointer;
-    transition:opacity .12s,border-color .12s}
-  .kachel .roh{font-size:.86rem;color:var(--leise);margin:8px 0 0}
-  .kachel.raus{opacity:.4;border-color:var(--warn)}
-  .kachel.raus .roh::before{content:"herausgenommen — ";color:var(--warn)}
+  .kachel{position:relative;background:var(--feld);border:1px solid var(--rand);border-radius:12px;padding:10px}
+  .kachel .roh{font-size:.86rem;color:var(--leise);margin:8px 34px 0 0}
+  /* X unten rechts: lehnt sofort ab (04.11.2026). U holt sie zurueck. */
+  .kachel .ablehnen{position:absolute;right:8px;bottom:6px;width:28px;height:28px;border-radius:8px;
+    border:1px solid var(--rand);background:var(--grund);color:var(--leise);font:inherit;font-size:1rem;
+    line-height:1;cursor:pointer;padding:0}
+  .kachel .ablehnen:hover{background:var(--warn);color:#2b0b06;border-color:var(--warn)}
   .leiste{position:sticky;bottom:0;background:var(--grund);border-top:1px solid var(--rand);
     padding:12px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 
@@ -250,7 +252,6 @@
     <div class="kacheln" id="kacheln"></div>
     <div class="leiste">
       <button class="pille" id="rasterFreigeben" style="background:var(--gut);color:#04240f;border:0;padding:12px 18px;font-size:.95rem;font-weight:650">Übrige freigeben <kbd>F</kbd></button>
-      <button class="pille" id="rasterSpaeter">Herausgenommene zurückstellen <kbd>3</kbd></button>
       <button class="pille" id="rasterNeu">Neu laden <kbd>N</kbd></button>
       <span class="fuss" id="rasterStand"></span>
     </div>
@@ -402,7 +403,7 @@
       <h2>Tastatur</h2>
       <p class="fuss">Jede Taste steht auch auf dem Knopf, zu dem sie gehört.<br>
       Kritische Botschaft: <b>1</b> freigeben · <b>2</b> ablehnen · <b>3</b> zurückstellen · <b>U</b> rückgängig<br>
-      Unkritische: <b>F</b> alle übrigen freigeben (Sammelfreigabe oben)<br>
+      Unkritische: <b>F</b> alle freigeben (Sammelfreigabe oben) · <b>✕</b> auf einer Kachel lehnt sie sofort ab<br>
       Allgemein: <b>N</b> neu laden · <b>T</b> zurückgestellt · <b>P</b> auf der Fassade · <b>X</b> abgelehnt<br>
       Zahlen funktionieren auf der Zahlenreihe und dem Nummernblock. In den Listenansichten wird je Zeile geklickt.
       Nach jeder Entscheidung rückt die nächste Botschaft nach.</p>
@@ -491,7 +492,6 @@ async function start () {
   el('sEinrichtung').addEventListener('click', () => schalten('einrichtung'));
   el('einrichtungAus').addEventListener('click', () => schalten('einrichtung'));
   el('rasterFreigeben').addEventListener('click', rasterFreigeben);
-  el('rasterSpaeter').addEventListener('click', rasterSpaeter);
   el('rasterNeu').addEventListener('click', () => laden(true));
   el('leerenKnopf').addEventListener('click', leeren);
   el('spielStart').addEventListener('click', spielStarten);
@@ -788,22 +788,23 @@ function zeichnenRaster () {
   }
   for (const item of rasterVorrat) {
     const k = document.createElement('div');
-    k.className = 'kachel' + (raus.has(item.id) ? ' raus' : '');
+    k.className = 'kachel';
     const buehne = buehneBauen();
     k.appendChild(buehne);
     const roh = document.createElement('div');
     roh.className = 'roh';
     roh.textContent = item.voll;
     k.appendChild(roh);
-    k.addEventListener('click', () => {
-      if (raus.has(item.id)) raus.delete(item.id); else raus.add(item.id);
-      zeichnenRaster();
-    });
+    const x = document.createElement('button');
+    x.className = 'ablehnen';
+    x.title = 'Ablehnen';
+    x.textContent = '✕';
+    x.addEventListener('click', () => entscheiden([item.id], 'ablehnen', 'neu'));
+    k.appendChild(x);
     ziel.appendChild(k);
     buehneMalen(buehne, item);
   }
-  const uebrig = rasterVorrat.filter(b => !raus.has(b.id)).length;
-  el('rasterStand').textContent = uebrig + ' von ' + rasterVorrat.length + ' würden freigegeben — Anklicken nimmt eine heraus.';
+  el('rasterStand').textContent = rasterVorrat.length + ' würden freigegeben — ✕ lehnt eine sofort ab, U holt sie zurück.';
 }
 
 // Die Listen werden alle 10 s nachgeladen. Unveraendert wird nicht neu
@@ -897,11 +898,6 @@ function rasterFreigeben () {
   entscheiden(ids, 'freigeben', 'neu');
 }
 
-function rasterSpaeter () {
-  const ids = [...raus];
-  if (!ids.length) { melden('Keine herausgenommen.'); return; }
-  entscheiden(ids, 'zurueckstellen', 'neu');
-}
 
 async function schalten (name) {
   const wert = !stand.schalter[name];
@@ -1600,7 +1596,6 @@ function taste (e) {
     if (n3 || t === 'z') { e.preventDefault(); entscheiden([item.id], 'zurueckstellen', 'neu'); }
   } else if (ansicht === 'raster') {
     if (n1 || t === 'f' || e.key === 'Enter') { e.preventDefault(); rasterFreigeben(); }
-    if (n3 || t === 'z') { e.preventDefault(); rasterSpaeter(); }
   }
 }
 </script>
