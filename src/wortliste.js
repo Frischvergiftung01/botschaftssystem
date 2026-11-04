@@ -29,6 +29,11 @@ module.exports = {
     // Slurs
     'kanake', 'neger', 'nigger', 'schwuchtel', 'judensau', 'judenschwein',
     'zigeuner', 'schlitzauge', 'itaker', 'rassenschande',
+    // Mehrzahl und Beugung — Wortgrenzen lassen "schwuchtel" nicht in
+    // "Schwuchteln" treffen (Lasttest 04.11.2026)
+    'arschloecher', 'hurensoehne', 'fotzen', 'missgeburten', 'schlampen', 'nutten',
+    'drecksaeue', 'untermenschen', 'spasten', 'spastis', 'mongos', 'vollidioten',
+    'kanaken', 'niggers', 'schwuchteln', 'judensaeue', 'judenschweine', 'schlitzaugen',
     // Sexuelles, explizit
     'ficken', 'arschficker', 'blowjob', 'muschi', 'titten', 'porno', 'pornhub',
     'onlyfans', 'masturbieren', 'wichsen',
