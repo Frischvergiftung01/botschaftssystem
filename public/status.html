@@ -315,7 +315,9 @@ function zeichnen (d) {
       } else if (r) {
         return rundeVoll(r);
       } else {
-        el('erklaerung').textContent = 'Kommt, sobald es weitergeht.';
+        // Keine weitere Runde eingetragen: offen bleiben, nichts versprechen,
+        // nichts absagen (04.11.2026).
+        el('erklaerung').textContent = 'Falls deine Botschaft noch gezeigt wird, sagen wir dir hier, wann.';
       }
       el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
       return planen(15000);
