@@ -220,13 +220,21 @@ function vollerText (b) { return b.name ? `${b.text} — ${b.name}` : b.text; }
  */
 function naechsteRundeSchaetzen (b, vorDir, jetzt) {
   const s = sessionen.stand(jetzt);
-  if (s.phase !== 'pause' || !s.kommend) return null;
   const standzeitMs = einstellungen.standzeit() * 1000;
+  const flaechen = passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length;
+  // Laufende Runde: reicht der restliche Nachschub fuer alle vor ihr?
+  if (s.phase === 'laeuft' && s.aktuell) {
+    const wechsel = Math.max(0, Math.floor((s.aktuell.nachschubBis - jetzt) / standzeitMs));
+    const plaetze = flaechen * wechsel;
+    return { laufend: true, plaetze, passt: vorDir < plaetze };
+  }
+  // Pause oder Auslaufen: die naechste Runde.
+  if (!s.kommend) return null;
   const laengeMs = s.kommend.endeStempel - Math.max(s.kommend.startStempel, jetzt);
   const wechsel = Math.max(0, Math.floor((laengeMs - standzeitMs) / standzeitMs) + 1);
-  const flaechen = passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length;
   const plaetze = flaechen * wechsel;
   return {
+    laufend: false,
     beginn: s.kommend.geplantStart,
     plaetze,
     passt: vorDir < plaetze,

@@ -292,6 +292,15 @@ function zeichnen (d) {
       el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
       return planen(15000);
     }
+    // Laufende Runde, aber der Rest reicht nicht: keine Minutenzahl, die am
+    // Rundenende ins Leere laeuft (04.11.2026).
+    if (d.naechsteRunde && d.naechsteRunde.laufend && !d.naechsteRunde.passt) {
+      el('ueberschrift').textContent = 'Freigegeben';
+      el('kernaussage').textContent = `${d.vorDir} Botschaften vor dir`;
+      el('erklaerung').textContent = 'Diese Runde ist voll — deine Botschaft kommt voraussichtlich in einer späteren Runde.';
+      el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
+      return planen(15000);
+    }
     const min = Math.max(1, Math.round(d.geschaetzteWartezeitSekunden / 60));
     el('ueberschrift').textContent = 'Freigegeben';
     el('kernaussage').textContent = d.vorDir === 0 ? 'Gleich geht es los' : `${d.vorDir} Botschaften vor dir`;
