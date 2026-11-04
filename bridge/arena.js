@@ -62,7 +62,8 @@ function sammeln (knoten, treffer = [], lage = {}) {
         typeof wert.id === 'number' && 'value' in wert) {
       const blende = /^Blende[ _]?(\d{1,2})$/i.exec(name);
       const text = /^(\d{1,2})[ _]/.exec(name);
-      if (blende) hier.blende.set(Number(blende[1]), wert.id);
+      if (/^Blendendauer$/i.test(name)) hier.dauer = wert.id;
+      else if (blende) hier.blende.set(Number(blende[1]), wert.id);
       else if (text) hier.text.set(Number(text[1]), wert.id);
     }
     // Lage mitfuehren, damit hinterher gesagt werden kann, WO gefunden wurde.
@@ -131,6 +132,7 @@ async function verbinden (arenaBasis) {
   return {
     pfad,
     flaechen,
+    dauer: bester.dauer ?? null,     // Regler "Blendendauer" im Patch, falls vorhanden
     layer: bester.layer,
     spalte: bester.spalte,
     clipName: bester.clipName,
@@ -165,4 +167,11 @@ async function setzen (arenaBasis, pfad, id, wert) {
   if (!antwort.ok) throw new Error(`Parameter ${id} nicht gesetzt (${antwort.status})`);
 }
 
-module.exports = { verbinden, setzen, sammeln, nochVerbunden, PFADE };
+/** Liest den Wert eines Parameters. Wirft bei Fehler. */
+async function lesen (arenaBasis, pfad, id) {
+  const antwort = await anfrage(`${arenaBasis}/${pfad}/${id}`);
+  if (!antwort.ok) throw new Error(`Parameter ${id} nicht lesbar (${antwort.status})`);
+  return (await antwort.json())?.value;
+}
+
+module.exports = { verbinden, setzen, lesen, sammeln, nochVerbunden, PFADE };

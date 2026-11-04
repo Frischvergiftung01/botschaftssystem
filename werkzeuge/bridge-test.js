@@ -49,10 +49,11 @@ const schlaf = ms => new Promise(r => setTimeout(r, ms));
 // mitschreiben. `weg` bestimmt, unter welchem Pfad sie die Parameter anbietet
 // — damit laesst sich die Pfadprobe der Bridge nachstellen.
 
-function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0, einzeln = false } = {}) {
+function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0, einzeln = false, dauer = null } = {}) {
   const zustand = {
     weg,
     idVersatz,
+    dauer,          // Regler "Blendendauer" in Sekunden; null = Patch ohne Regler
     ereignisse: [],
     kompositionAbrufe: 0,
     // Welche der beiden Instanzen laeuft gerade? Genau daran ist die Bridge
@@ -71,7 +72,8 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0, einzeln
       { id: blendeBasis + zustand.idVersatz + f.nr, value: 1 }
     ]),
     ['Schrifthoehe max', { id: 7001, value: 40 }],
-    ['Opacity', { id: 7002, value: 1 }]
+    ['Opacity', { id: 7002, value: 1 }],
+    ...(zustand.dauer === null ? [] : [['Blendendauer', { id: 7003, value: zustand.dauer }]])
   ]);
 
   const clip = (name, felderSatz, verbunden) => ({
@@ -118,6 +120,10 @@ function attrappe ({ weg = 'composition/parameter/by-id', idVersatz = 0, einzeln
     const treffer = new RegExp('^' + zustand.weg + '/(\\d+)$').exec(url);
     if (!treffer) { antwort.writeHead(404); return antwort.end(); }
     const id = Number(treffer[1]);
+    if (id === 7003 && anfrage.method === 'GET' && zustand.dauer !== null) {
+      antwort.writeHead(200, { 'content-type': 'application/json' });
+      return antwort.end(JSON.stringify({ id, value: zustand.dauer }));
+    }
     // Nach einem Neuladen des Effekts gibt es die alten IDs nicht mehr.
     const rest = id % 1000;
     const bekannt = rest - zustand.idVersatz;
@@ -319,6 +325,34 @@ const BASIS = 'http://127.0.0.1:' + process.env.PORT;
       einzelne.kompositionAbrufe === 1, einzelne.kompositionAbrufe);
     await lauf3.stoppen();
     await einzelne.schliessen();
+  }
+
+  console.log('\nRegler "Blendendauer" im Patch bestimmt die Wartezeit');
+  {
+    const mitRegler = attrappe({ einzeln: true, dauer: 0.8 });
+    const port = await mitRegler.starten();
+    const lauf4 = bridge.starten({
+      server: BASIS, arena: `http://127.0.0.1:${port}/api/v1`,
+      taktMs: 200, blendeMs: 350, dauerMs: 300, ruhig: true
+    });
+    while (mitRegler.ereignisse.length < FLAECHEN.length * 2) await schlaf(100);
+    await schlaf(500);
+    pruefe('der Reglerwert wird übernommen', lauf4.blendeMs === 800, lauf4.blendeMs);
+
+    const vorher = mitRegler.ereignisse.length;
+    await schlaf(6000);
+    const neu = mitRegler.ereignisse.slice(vorher);
+    const aus = neu.find(e => e.id > 6000 && e.wert === 0);
+    const nr = aus ? aus.id - 6000 : 0;
+    const text = aus && neu.find(e => e.id === mitRegler.textIdFuer(nr) && e.zeit >= aus.zeit);
+    pruefe('zwischen Ausblenden und Textwechsel liegen die 0,8 s',
+      text && text.zeit - aus.zeit >= 790, text && text.zeit - aus.zeit);
+
+    mitRegler.dauer = 0.2;                     // jemand dreht am Regler
+    await schlaf(800);
+    pruefe('eine Änderung am Regler kommt an', lauf4.blendeMs === 200, lauf4.blendeMs);
+    await lauf4.stoppen();
+    await mitRegler.schliessen();
   }
 
   console.log('\nDer Ordner bridge/ muss für sich allein lauffähig sein');

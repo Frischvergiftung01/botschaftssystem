@@ -11,8 +11,9 @@
 // bewachen muesste. Und ein Poll-Ausfall ist harmlos: die Wand behaelt, was
 // sie zeigt.
 //
-// DER WECHSEL sind drei Aufrufe: Blende auf 0, 350 ms warten (so lange
-// braucht der Smooth-Knoten im Patch), Text tauschen, Blende auf 1. Der Text
+// DER WECHSEL sind drei Aufrufe: Blende auf 0, warten (so lange braucht der
+// Smooth-Knoten im Patch — die Dauer kommt vom Regler "Blendendauer" im
+// Patch, ohne Regler gilt blendeMs), Text tauschen, Blende auf 1. Der Text
 // wird dabei erst NACH der Wartezeit gelesen — kommt waehrenddessen ein
 // neuerer, wird gleich der gezeigt statt zweimal geblendet.
 //
@@ -29,7 +30,9 @@ const VORGABE = {
   server: 'https://botschaft.frischvergiftung.de',
   arena: 'http://127.0.0.1:8080/api/v1',
   taktMs: 500,
-  blendeMs: 350,
+  blendeMs: 350,          // nur Rueckfall, wenn der Patch keinen Regler "Blendendauer" hat
+  // Wie oft der Regler "Blendendauer" in Arena nachgelesen wird.
+  dauerMs: 2000,
   // Nach so vielen Fehlern am Stueck werden die Parameter-IDs neu gelesen:
   // Arena vergibt sie beim Neuladen des Effekts neu.
   fehlerBisNeuverbinden: 5,
@@ -87,7 +90,9 @@ function starten (zusatz = {}) {
     return flaechen.get(nr);
   };
 
-  let verbindung = null;      // { pfad, flaechen, layer, spalte, ... }
+  let verbindung = null;      // { pfad, flaechen, dauer, layer, spalte, ... }
+  let blendeMs = e.blendeMs;  // aktuelle Wartezeit; folgt dem Regler im Patch
+  let letzteDauer = 0;
   let letzteWacht = 0;
   let letzterPuls = 0;
   let pulsGeklagt = false;
@@ -108,8 +113,31 @@ function starten (zusatz = {}) {
       sagen(`Hinweis: der Patch liegt ${verbindung.instanzen}× in der Komposition — `
         + 'geschrieben wird in den laufenden Clip.');
     }
+    if (!verbindung.dauer) {
+      sagen(`Kein Regler „Blendendauer" im Patch — Blende ${blendeMs} ms aus den Einstellungen`);
+    }
     letzteWacht = Date.now();
+    letzteDauer = 0;
     arenaFehler = 0;
+  }
+
+  /**
+   * Liest den Regler "Blendendauer" (Sekunden) und uebernimmt ihn als
+   * Wartezeit. Ein Lesefehler aendert nichts: dann gilt der letzte Wert.
+   */
+  async function dauerLesen () {
+    if (!verbindung?.dauer || Date.now() - letzteDauer < e.dauerMs) return;
+    letzteDauer = Date.now();
+    let s;
+    try {
+      s = Number(await arena.lesen(e.arena, verbindung.pfad, verbindung.dauer));
+    } catch { return; }
+    if (!Number.isFinite(s) || s < 0) return;
+    const ms = Math.round(s * 1000);
+    if (ms !== blendeMs) {
+      sagen(`Blendendauer ${blendeMs} ms → ${ms} ms`);
+      blendeMs = ms;
+    }
   }
 
   /**
@@ -205,7 +233,7 @@ function starten (zusatz = {}) {
       // Steht die Flaeche schon dunkel, ist Ausblenden nichts als Wartezeit.
       if (z.gezeigt) {
         await setzen(ids.blende, 0);
-        await schlaf(e.blendeMs);
+        await schlaf(blendeMs);
       }
       const text = z.ziel;              // absichtlich erst jetzt: der neueste gilt
       await setzen(ids.text, text);
@@ -257,6 +285,7 @@ function starten (zusatz = {}) {
     }
     await wachen();
     if (!verbindung) return;                 // der Waechter hat sie verworfen
+    await dauerLesen();
     pulsen();
     const daten = await anzeigeHolen();
     if (!daten) return;
@@ -297,6 +326,7 @@ function starten (zusatz = {}) {
 
   return {
     zahlen,
+    get blendeMs () { return blendeMs; },
     flaechen,
     einstellungen: e,
     async stoppen () { laeuft = false; clearInterval(bericht); await schleife; }
