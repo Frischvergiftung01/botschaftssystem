@@ -1526,7 +1526,10 @@ function melden (text) {
 }
 
 function taste (e) {
-  if (e.target.tagName === 'INPUT' || e.metaKey || e.ctrlKey || e.altKey) return;
+  // In jedem Eingabefeld gehoert die ganze Tastatur dem Feld (auch den
+  // Textfeldern der Hinweise und Fuellsel).
+  if (e.target.closest?.('input, textarea, select, [contenteditable]') ||
+      e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape' && !el('rahmen').hidden) { e.preventDefault(); return rahmenZu(); }
   const t = e.key.toLowerCase();
   if (t === 't') return wechseln('zurueckgestellt');
