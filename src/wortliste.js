@@ -43,7 +43,12 @@ module.exports = {
     'holocaustluege', 'judenvergasung',
     // Drogen (Entscheidung 04.11.2026: ablehnen, auch scherzhaft)
     'drogen', 'kokain', 'koks', 'koksen', 'kiffen', 'kiffer', 'joint', 'cannabis',
-    'haschisch', 'heroin', 'crystal meth', 'mdma', 'ecstasy', 'lsd', 'weed', 'bubatz'
+    'haschisch', 'heroin', 'crystal meth', 'mdma', 'ecstasy', 'lsd', 'weed', 'bubatz',
+    // Anschlaege und Gewalttaten (Entscheidung 04.11.2026: kein Thema fuer den Abend,
+    // auch nicht als Gedenken oder "gegen Terror")
+    'anschlag', 'anschlaege', 'anschlages', 'anschlags', 'terroranschlag', 'attentat',
+    'attentate', 'attentaeter', 'terror', 'terrorist', 'terroristen', 'terrorismus',
+    'amok', 'amoklauf', 'amoklaeufer'
   ],
 
   // Auch ohne Wortgrenzen, gegen den zusammengezogenen Text. Nur lange,
@@ -95,6 +100,8 @@ module.exports = {
     'karlsruher', 'eintracht', 'hoffenheim', 'hertha', 'sechzig',
     // Richtlinie 4.5 / heikel
     'suizid', 'selbstmord', 'ritzen', 'komasaufen',
+    // Opfer: Gedenken an Ereignisse oder Schimpfwort — beides sieht ein Mensch (04.11.2026)
+    'opfer',
     // Alkohol (Entscheidung 04.11.2026: immer Grenzfall, auch "Prost")
     'alkohol', 'prost', 'bier', 'biere', 'betrunken', 'besoffen', 'saufen', 'sauf',
     'schnaps', 'wodka', 'vodka', 'sekt', 'wein', 'gluehwein', 'cocktail', 'rausch',

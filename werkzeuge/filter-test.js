@@ -46,6 +46,12 @@ const FAELLE = [
   ['Erstmal einen kiffen',                'ABLEHNEN', '4.10 Drogen'],
   ['Wer hat Koks?',                       'ABLEHNEN', '4.10 Drogen'],
   ['Nein zu Drogen',                      'ABLEHNEN', '4.10 Drogen, auch ablehnend'],
+  ['Wir trauern um die Opfer von Halle',  'PRUEFEN',  '4.11 Opfer: Gedenken'],
+  ['Kevin ist ein Opfer',                 'PRUEFEN',  '4.11 Opfer: Schimpfwort, 1b verschaerft'],
+  ['Gegen Terror und Hass',               'ABLEHNEN', '4.11 Terror, auch dagegen'],
+  ['Wir denken an die Opfer des Anschlags', 'ABLEHNEN', '4.11 Anschlag'],
+  ['Amoklauf',                            'ABLEHNEN', '4.11 Amok'],
+  ['Attentat',                            'ABLEHNEN', '4.11 Attentat'],
 
   ['asdasdasd',                            'ABLEHNEN', '4.9 Tastatursalat'],
   ['qwertzuiop',                           'ABLEHNEN', '4.9 Tastaturreihe'],
