@@ -19,6 +19,7 @@ process.env.ZEITZONE = 'Europe/Berlin';
 // so kurz, dass die Drosselung des Schedulers zum Engpass wird: 33 Flaechen
 // bei 10 s Standzeit sind 3,3 Wechsel je Sekunde, erlaubt sind 5.
 process.env.STANDZEIT = '10';
+process.env.VORLAUF_SEKUNDEN = '0';   // der Vorlauf hat einen eigenen Test (belegungsplan-test)
 process.env.PLAN_HORIZONT = '30';
 process.env.LOG_LEVEL = 'silent';
 for (const e of ['', '-wal', '-shm']) fs.rmSync(process.env.DB_PFAD + e, { force: true });

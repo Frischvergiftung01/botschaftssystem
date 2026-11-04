@@ -81,6 +81,12 @@ module.exports = {
   // nachgerechnet wird.
   planHorizontSekunden: Number(process.env.PLAN_HORIZONT || 180),
 
+  // Mindestvorlauf: eine frisch freigegebene Botschaft erscheint fruehestens
+  // so viele Sekunden nach der Freigabe — auch wenn die Wand frei waere. Sonst
+  // kommt sie am ruhigen Anfang sofort, und bis der Absender am angesagten Ort
+  // steht, ist sie schon wieder weg. (Entscheidung 04.11.2026)
+  vorlaufSekunden: Number(process.env.VORLAUF_SEKUNDEN || 60),
+
   // Puls der Bridge. Leer = der Endpunkt nimmt jeden Puls an; gesetzt = die
   // Bridge muss denselben Wert in ihrer einstellungen.json stehen haben.
   bridgeToken: (process.env.BRIDGE_TOKEN || '').trim(),

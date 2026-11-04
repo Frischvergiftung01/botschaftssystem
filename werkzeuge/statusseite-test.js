@@ -12,6 +12,7 @@ const fs = require('fs');
 process.env.DB_PFAD = '/tmp/statusseite-test.db';
 process.env.ZEITZONE = 'Europe/Berlin';
 process.env.STANDZEIT = '5';
+process.env.VORLAUF_SEKUNDEN = '0';   // der Vorlauf hat einen eigenen Test (belegungsplan-test)
 process.env.PLAN_HORIZONT = '20';
 process.env.PORT = '3996';
 process.env.HOST = '127.0.0.1';

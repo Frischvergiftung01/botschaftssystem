@@ -301,6 +301,27 @@ console.log('\nNeu freigegebene Botschaften kommen in den Nachschlag');
     wann - T0 < 90000, Math.round((wann - T0) / 1000) + ' s');
 }
 
+console.log('\nMindestvorlauf: frisch Freigegebenes kommt nicht sofort');
+{
+  // Leere Wand, eine einzige Botschaft, gerade freigegeben. Ohne Vorlauf stuende
+  // sie in Sekunden an der Fassade — mit Vorlauf fruehestens 60 s spaeter.
+  const frisch = { id: 1, text: 'Gerade freigegeben', name: null, anzahl_anzeigen: 0,
+    zuletzt_gezeigt: null, erstellt_am: T0 - 5000, entschieden_am: T0 };
+  const ohne = plan.bauen({ zustand: leererZustand(), vorrat: [frisch], hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 180000 });
+  const mit = plan.bauen({ zustand: leererZustand(), vorrat: [frisch], hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 180000, vorlaufMs: 60000 });
+  const erstes = p => Math.min(...p.eintraege.filter(e => e.botschaftId === 1).map(e => e.start));
+  pruefe('ohne Vorlauf: sofort', erstes(ohne) - T0 < 5000, Math.round((erstes(ohne) - T0) / 1000) + ' s');
+  pruefe('mit Vorlauf: fruehestens nach 60 s', erstes(mit) - T0 >= 60000, Math.round((erstes(mit) - T0) / 1000) + ' s');
+  pruefe('aber nicht viel spaeter', erstes(mit) - T0 < 60000 + STANDZEIT, Math.round((erstes(mit) - T0) / 1000) + ' s');
+
+  const gezeigt = { ...frisch, anzahl_anzeigen: 3, zuletzt_gezeigt: T0 - 30000 };
+  const wieder = plan.bauen({ zustand: leererZustand(), vorrat: [gezeigt], hinweise: [],
+    jetzt: T0, standzeitMs: STANDZEIT, horizontMs: 180000, vorlaufMs: 60000 });
+  pruefe('schon Gezeigtes wartet nicht', erstes(wieder) - T0 < 5000, Math.round((erstes(wieder) - T0) / 1000) + ' s');
+}
+
 console.log('\nStreichen nach einem Moderationseingriff');
 {
   const p = plan.bauen({

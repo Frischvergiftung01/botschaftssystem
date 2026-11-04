@@ -68,6 +68,8 @@ function einsortieren (liste, eintrag) {
  * @param {number} lage.jetzt
  * @param {number} lage.standzeitMs
  * @param {number} lage.horizontMs wie weit nach vorn gerechnet wird
+ * @param {number} [lage.vorlaufMs] Mindestabstand zwischen Freigabe und
+ *   erstem Auftritt
  * @param {number} [lage.endeMs] Nachschubschluss der Session: danach wird
  *   nichts mehr belegt, also auch nichts mehr gebucht
  * @param {Array} [lage.gebucht] bereits vergebene, noch nicht abgearbeitete
@@ -132,7 +134,11 @@ function bauen (lage) {
     text: b.name ? `${b.text} — ${b.name}` : b.text,
     anzahl: (b.anzahl_anzeigen || 0) + (schonGezeigt.get(b.id) || 0),
     zuletzt: Math.max(b.zuletzt_gezeigt || 0, zuletztGebucht.get(b.id) || 0),
-    erstellt: b.erstellt_am || 0
+    erstellt: b.erstellt_am || 0,
+    // Mindestvorlauf: noch nie gezeigt heisst, fruehestens so lange nach der
+    // Freigabe. Ist sie schon gebucht, liegt jede weitere Buchung ohnehin spaeter.
+    ab: (b.anzahl_anzeigen || 0) > 0 ? 0
+      : (b.entschieden_am || b.erstellt_am || 0) + (lage.vorlaufMs || 0)
   })).sort(vorne);
 
   const durchsagen = (lage.hinweise || []).map(h => ({
@@ -173,6 +179,7 @@ function bauen (lage) {
     } else {
       for (let i = 0; i < vorrat.length; i++) {
         const b = vorrat[i];
+        if (t < b.ab) continue;                            // Mindestvorlauf noch nicht um
         if ((belegtBis.get(b.id) || 0) > t) continue;      // steht gerade woanders
         if (b.id === zuletztDort.get(nr)) continue;        // nicht direkt wiederholen
         const g = mass(b.text, f.breite);

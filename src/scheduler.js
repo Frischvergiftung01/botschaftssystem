@@ -102,6 +102,7 @@ function planPflegen (t) {
     jetzt: t,
     standzeitMs: einstellungen.standzeit() * 1000,
     horizontMs,
+    vorlaufMs: cfg.vorlaufSekunden * 1000,
     endeMs: sessionen.nachschubBis(),
     gebucht: plan ? plan.eintraege : []
   });
@@ -172,6 +173,7 @@ function belegen (f, t) {
   const laufendeIds = new Set([...zustand.values()].filter(x => x.nr !== f.nr && x.ende > t).map(x => x.botschaftId));
 
   for (const b of kandidaten) {
+    if (!vorlaufUm(b, t)) continue;                 // frisch freigegeben: noch nicht
     if (laufendeIds.has(b.id)) continue;           // nicht zweimal gleichzeitig an der Fassade
     if (b.id === f.botschaftId) continue;          // nicht direkt wiederholen
     const voll = vollerText(b);
@@ -336,6 +338,15 @@ function raeumen (f) {
   f.start = 0;
   f.ende = 0;
   f.groesse = null;
+}
+
+/**
+ * Mindestvorlauf: eine noch nie gezeigte Botschaft erscheint fruehestens
+ * `vorlaufSekunden` nach ihrer Freigabe. Gilt im Plan wie im Rueckfall.
+ */
+function vorlaufUm (b, t) {
+  if ((b.anzahl_anzeigen || 0) > 0) return true;
+  return t >= (b.entschieden_am || b.erstellt_am || 0) + cfg.vorlaufSekunden * 1000;
 }
 
 /** Botschaft plus Absender, so wie es auf der Fassade steht. */
