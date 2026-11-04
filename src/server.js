@@ -198,6 +198,8 @@ fastify.get('/api/status/:token', async (req, reply) => {
           * einstellungen.standzeit()),
         b.status === 'freigegeben' && b.entschieden_am
           ? Math.ceil(Math.max(0, b.entschieden_am + cfg.vorlaufSekunden * 1000 - jetzt) / 1000) : 0),
+    // Zwischen zwei Runden: passt sie voraussichtlich in die naechste?
+    naechsteRunde: b.anzahl_anzeigen > 0 ? null : naechsteRundeSchaetzen(b, naechste, jetzt),
     jetztAuf: laufend ? flaecheInfo(laufend.flaeche) : null,
     gebucht,
     zuletzt: anzeigen[0] ? { ...flaecheInfo(anzeigen[0].flaeche), start: anzeigen[0].start } : null,
@@ -209,6 +211,29 @@ fastify.get('/api/status/:token', async (req, reply) => {
 });
 
 function vollerText (b) { return b.name ? `${b.text} — ${b.name}` : b.text; }
+
+/**
+ * Schaetzung fuer die Pause zwischen zwei Runden: wie viele Erstauftritte hat
+ * die naechste Runde fuer einen Text dieser Laenge, und reicht das fuer alle,
+ * die vor ihm stehen? Grob: Flaechen, auf die er passt, mal Wechsel je Flaeche.
+ * Eine Schaetzung wie der Countdown, keine Zusage. (04.11.2026)
+ */
+function naechsteRundeSchaetzen (b, vorDir, jetzt) {
+  const s = sessionen.stand(jetzt);
+  if (s.phase !== 'pause' || !s.kommend) return null;
+  const standzeitMs = einstellungen.standzeit() * 1000;
+  const laengeMs = s.kommend.endeStempel - Math.max(s.kommend.startStempel, jetzt);
+  const wechsel = Math.max(0, Math.floor((laengeMs - standzeitMs) / standzeitMs) + 1);
+  const flaechen = passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length;
+  const plaetze = flaechen * wechsel;
+  return {
+    beginn: s.kommend.geplantStart,
+    plaetze,
+    passt: vorDir < plaetze,
+    // "frueh dabei" nur, wenn sie im ersten Drittel der Runde drankommt
+    frueh: vorDir < plaetze / 3
+  };
+}
 
 /** Wartet diese Botschaft noch auf ihren ersten Auftritt (innerhalb der Obergrenze)? */
 function wartetNochAufAuftritt (b, jetzt = Date.now()) {

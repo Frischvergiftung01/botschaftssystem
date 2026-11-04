@@ -277,12 +277,19 @@ function zeichnen (d) {
     // Zwischen zwei Runden ist ein Countdown eine Lüge: es passiert nichts,
     // bis die nächste startet. Dann lieber die Uhrzeit nennen.
     if (s.phase && s.phase !== 'laeuft' && s.phase !== 'ohnePlan') {
+      // Geschaetzt, nicht behauptet: passt sie in die naechste Runde? (04.11.2026)
+      const r = d.naechsteRunde;
       el('ueberschrift').textContent = 'Freigegeben';
-      el('kernaussage').textContent = 'Kommt in der nächsten Runde';
-      el('erklaerung').textContent = s.kommend
-        ? `Die nächste beginnt gegen ${s.kommend.geplantStart}. Deine Botschaft ist dann früh dabei.`
-        : 'Sobald es weitergeht, ist deine Botschaft dabei.';
-      el('balken').style.width = '50%';
+      el('kernaussage').textContent = d.vorDir > 0 ? `${d.vorDir} Botschaften vor dir` : 'Als Nächste an der Reihe';
+      if (r && r.passt) {
+        el('erklaerung').textContent = `Kommt in der Runde ab ${r.beginn}.`
+          + (r.frueh ? ' Deine Botschaft ist dann früh dabei.' : '');
+      } else if (r) {
+        el('erklaerung').textContent = 'Kommt voraussichtlich in einer späteren Runde.';
+      } else {
+        el('erklaerung').textContent = 'Kommt, sobald es weitergeht.';
+      }
+      el('balken').style.width = Math.max(4, 100 - Math.min(100, d.vorDir * 3)) + '%';
       return planen(15000);
     }
     const min = Math.max(1, Math.round(d.geschaetzteWartezeitSekunden / 60));
