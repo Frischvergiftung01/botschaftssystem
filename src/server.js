@@ -335,13 +335,15 @@ fastify.post('/api/moderation/entscheiden', async (req, reply) => {
 
 fastify.post('/api/moderation/schalter', async (req, reply) => {
   const name = String(req.body?.name ?? '');
-  if (!['autoFreigabe', 'nachschub', 'belegungsplan', 'einrichtung'].includes(name)) {
+  if (!['autoFreigabe', 'nachschub', 'belegungsplan', 'einrichtung', 'hinweise'].includes(name)) {
     return reply.code(400).send({ fehler: 'Unbekannter Schalter.' });
   }
   const stand = einstellungen.setzen(name, Boolean(req.body?.wert));
   // In beide Richtungen: was gebucht war, liegt nach dem Einrichten in der
   // Vergangenheit. Der Plan baut sich von selbst neu auf.
   if (name === 'einrichtung') scheduler.planVerwerfen();
+  // Wie beim Scharfstellen: nur die Buchungen der Stirnseite Mitte gelten nicht mehr.
+  if (name === 'hinweise') scheduler.planFlaecheLeeren(cfg.hinweisFlaeche);
   req.log.warn({ name, wert: Boolean(req.body?.wert) }, 'Schalter umgelegt');
   return { schalter: stand };
 });

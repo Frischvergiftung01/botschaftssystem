@@ -146,6 +146,29 @@ for (let i = 0; i < 40; i++) {
     pruefe('beide waren dran', gesehen.size === 2, [...gesehen]);
   }
 
+  console.log('\nSchalter "Hinweise" oben: aus haelt sie an, scharf bleibt scharf');
+  {
+    const aus = await ruf('/api/moderation/schalter', { name: 'hinweise', wert: false });
+    pruefe('der Schalter laesst sich umlegen', aus.statusCode === 200 && aus.json().schalter.hinweise === false,
+      aus.json());
+    const d = hinweise.stand();
+    pruefe('die Plaetze bleiben scharf', d.scharfe === 2, d.scharfe);
+    pruefe('der Stand meldet die Hinweise als aus', d.aktiv === false, d.aktiv);
+    const f = flaeche();
+    const standNoch = f.text;
+    scheduler.takt();
+    pruefe('der laufende Hinweis steht zu Ende', f.text === standNoch, f.text);
+    f.ende = Date.now() - 1;
+    await takte(3);
+    pruefe('danach eine Botschaft statt eines Hinweises',
+      Boolean(f.text) && f.botschaftId !== null && f.hinweisId === null, f.text);
+
+    await ruf('/api/moderation/schalter', { name: 'hinweise', wert: true });
+    f.ende = Date.now() - 1;
+    await takte(3);
+    pruefe('wieder an: die scharfen Hinweise kommen zurueck', f.hinweisId !== null, f.text);
+  }
+
   console.log('\nHerausnehmen gibt die Flaeche wieder frei');
   {
     await ruf('/api/moderation/hinweis-scharf', { nr: 1, wert: false });

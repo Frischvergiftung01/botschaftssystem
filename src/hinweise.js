@@ -28,6 +28,12 @@ const cfg = require('./config');
 const { db, abfragen } = require('./db');
 const { FLAECHEN } = require('./flaechen');
 const { groesseFuer } = require('./text');
+const einstellungen = require('./einstellungen');
+
+/** Scharf UND der Schalter "Hinweise" oben ist an — nur dann an die Wand. */
+function wirksam (h) {
+  return einstellungen.schalter().hinweise && h.scharf && h.text.trim();
+}
 
 const FLAECHE = FLAECHEN.find(f => f.nr === cfg.hinweisFlaeche) || FLAECHEN[0];
 
@@ -59,7 +65,7 @@ function sicherstellen () {
 
 /** Steht irgendein Hinweis scharf? Der Scheduler fragt das bei jedem Wechsel. */
 function scharfeVorhanden () {
-  return alle().some(h => h.scharf && h.text.trim());
+  return alle().some(wirksam);
 }
 
 /**
@@ -70,7 +76,7 @@ function scharfeVorhanden () {
  * @param {number|null} zuletztId Hinweis, der gerade auf der Flaeche steht
  */
 function naechster (zuletztId = null) {
-  const scharfe = alle().filter(h => h.scharf && h.text.trim());
+  const scharfe = alle().filter(wirksam);
   if (!scharfe.length) return null;
   const sortiert = [...scharfe].sort((a, b) =>
     a.anzahl_anzeigen - b.anzahl_anzeigen ||
@@ -82,7 +88,7 @@ function naechster (zuletztId = null) {
 
 /** Die scharfen Plaetze als Rohzeilen — fuer den Belegungsplan. */
 function scharfeListe () {
-  return alle().filter(h => h.scharf && h.text.trim());
+  return alle().filter(wirksam);
 }
 
 /** Ein Platz nach seiner id. Der Plan bucht ids, nicht Nummern. */
@@ -178,6 +184,7 @@ function stand () {
     maxZeichen: cfg.maxZeichenHinweis,
     minVersalhoehe: cfg.minVersalhoehe,
     scharfe: zeilen.filter(z => z.scharf).length,
+    aktiv: einstellungen.schalter().hinweise,   // Schalter oben in der Leiste
     zeilen
   };
 }

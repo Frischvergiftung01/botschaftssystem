@@ -205,6 +205,7 @@
   <div class="rechts">
     <button class="pille" id="sAuto">Auto-Freigabe</button>
     <button class="pille" id="sNachschub">Nachschub</button>
+    <button class="pille" id="sHinweise">Hinweise</button>
     <button class="pille" id="abmelden">Abmelden</button>
   </div>
 </header>
@@ -315,6 +316,9 @@
       sich von selbst auf die übrigen 32. Nach dem Herausnehmen läuft der Hinweis seine Standzeit
       zu Ende, dann ist die Fläche wieder frei.<br>
       Hinweise laufen nur, solange auch eine <b>Session</b> läuft.</p>
+      <p class="fuss" id="hinweiseAusVermerk" hidden style="color:var(--gold)"><b>Hinweise sind oben
+      ausgeschaltet.</b> Scharfe Plätze bleiben scharf, kommen aber erst wieder an die Fassade,
+      wenn „Hinweise“ oben wieder an ist.</p>
     </div>
     <div id="hinweisListe" style="margin-top:14px"></div>
     <div class="werkzeug">
@@ -475,6 +479,7 @@ async function start () {
   });
   el('sAuto').addEventListener('click', () => schalten('autoFreigabe'));
   el('sNachschub').addEventListener('click', () => schalten('nachschub'));
+  el('sHinweise').addEventListener('click', () => schalten('hinweise'));
   el('sPlan').addEventListener('click', () => schalten('belegungsplan'));
   el('sEinrichtung').addEventListener('click', () => schalten('einrichtung'));
   el('einrichtungAus').addEventListener('click', () => schalten('einrichtung'));
@@ -578,6 +583,10 @@ function zahlenZeichnen () {
   el('sAuto').className = 'pille ' + (a ? 'aus' : 'an');   // an = Moderation liest alles mit
   el('sNachschub').textContent = 'Nachschub ' + (n ? 'läuft' : 'aus');
   el('sNachschub').className = 'pille ' + (n ? 'an' : 'aus');
+  const h = stand.schalter.hinweise !== false;
+  el('sHinweise').textContent = 'Hinweise ' + (h ? 'an' : 'aus');
+  el('sHinweise').className = 'pille ' + (h ? 'an' : 'aus');
+  el('hinweiseAusVermerk').hidden = h;
   fassadeZeichnen();
   const ein = stand.schalter.einrichtung === true;
   el('einrichtungsbalken').hidden = !ein;
@@ -881,6 +890,8 @@ async function schalten (name) {
   melden({
     autoFreigabe: 'Auto-Freigabe ' + (wert ? 'an — saubere Botschaften gehen ohne Moderation durch' : 'aus — alles geht durch die Moderation'),
     nachschub: 'Nachschub ' + (wert ? 'läuft wieder' : 'angehalten — Laufendes läuft aus'),
+    hinweise: 'Hinweise ' + (wert ? 'an — scharfe Plätze kommen beim nächsten Wechsel'
+      : 'aus — ein laufender Hinweis steht noch zu Ende'),
     belegungsplan: 'Belegungsplan ' + (wert ? 'an — Flächen werden wieder im Voraus gebucht' : 'aus — der Scheduler entscheidet erst beim Wechsel'),
     einrichtung: wert
       ? 'Einrichtungsmodus an — die Fassade zeigt Flächennamen'

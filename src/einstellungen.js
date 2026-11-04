@@ -21,7 +21,10 @@ const SCHLUESSEL = {
   autoFreigabe: 'auto_freigabe',
   nachschub: 'nachschub',
   belegungsplan: 'belegungsplan',
-  einrichtung: 'einrichtung'
+  einrichtung: 'einrichtung',
+  // `hinweise` aus heisst: scharfe Hinweise bleiben scharf, kommen aber nicht
+  // an die Wand. Wiedereinschalten setzt genau dort fort.
+  hinweise: 'hinweise'
 };
 const STANDZEIT = 'standzeit';
 const STANDZEIT_MIN = 5;
@@ -32,7 +35,8 @@ function vorgabe () {
     autoFreigabe: cfg.autoFreigabe, // sauberes FREI direkt in die Anzeige?
     nachschub: true,                // teilt der Scheduler neue Botschaften zu?
     belegungsplan: true,            // wird im Voraus gebucht statt erst beim Wechsel?
-    einrichtung: false              // zeigt die Fassade ihre eigenen Flaechennamen?
+    einrichtung: false,             // zeigt die Fassade ihre eigenen Flaechennamen?
+    hinweise: true                  // duerfen scharfe Hinweise an die Wand?
   };
 }
 
