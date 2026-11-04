@@ -219,6 +219,7 @@ function rundeVoll (r) {
       + 'zeigen können. Deine gehört leider auch dazu. Wir hoffen auf dein Verständnis und wünschen dir '
       + 'natürlich trotzdem noch einen schönen Abend.';
     el('balken').style.width = '0';
+    el('resonanz').hidden = false;   // Endstand: hier darf der Link stehen
     return planen(60000);
   }
   el('ueberschrift').textContent = 'Danke für deine Botschaft';

@@ -76,10 +76,10 @@
     </div>
   </div>
 
-  <div id="namensfeld">
-    <label for="name">Dein Vorname <span class="neben">— optional</span></label>
-    <input id="name" name="name" maxlength="15" placeholder="Lena">
-  </div>
+  <!-- Kein eigenes Namensfeld mehr (04.11.2026): wer seinen Namen dabeihaben
+       will, schreibt ihn in die Botschaft. Das leere Feld bleibt nur, damit
+       Entwurf und Absenden unveraendert arbeiten. -->
+  <input id="name" name="name" type="hidden" value="">
 
   <div class="vorschau">
     <div class="titel" id="vorschauTitel">So sieht das auf der Fassade aus</div>
@@ -92,8 +92,7 @@
 </form>
 
 <footer>
-  Keine Anmeldung, keine Konten. Gespeichert wird deine Botschaft — und dein Vorname, wenn du ihn
-  angibst. Sonst nichts über dich.<br>
+  Keine Anmeldung, keine Konten. Gespeichert wird deine Botschaft. Sonst nichts über dich.<br>
   Dass du deine Botschaft später wiederfindest, merkt sich dein Browser, nicht wir. Nur damit
   niemand im Sekundentakt schreibt, merken wir uns eine anonyme Prüfsumme deines Geräts.<br>
   <a href="/datenschutz" style="color:inherit">Datenschutz</a> ·
