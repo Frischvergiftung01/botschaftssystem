@@ -88,6 +88,8 @@ module.exports = {
     'gendern', 'impfpflicht', 'corona', 'migration', 'asyl', 'fluechtlinge',
     'abschiebung', 'remigration', 'free palestine', 'islamisten', 'scharia',
     'scientology',
+    // Stuttgarter Stadtthemen: Grenzfall, nicht ablehnen (Entscheidung 04.11.2026)
+    'stuttgart 21', 's21', 'oben bleiben', 'k21',
     // Richtlinie 4.6 — Werbung, Marken, Kommerz
     'mercedes', 'porsche', 'bosch', 'daimler', 'edeka', 'lidl', 'aldi', 'rewe',
     'mcdonalds', 'burger king', 'coca cola', 'red bull', 'netflix', 'amazon',

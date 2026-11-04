@@ -41,6 +41,7 @@ const FAELLE = [
   ['Wer hat noch Pillen für später?',                     'ABLEHNEN'],
 
   ['Prost Stuttgart, was für ein Abend',                  'PRUEFEN'],
+  ['Hallo Stuttgart 21, wir warten noch',                 'PRUEFEN'],
   ['Ich bin so betrunken, ich weiß nicht mehr wo ich bin', 'PRUEFEN'],
 
   ['Rettet das Klima, bevor es zu spät ist',              'PRUEFEN'],

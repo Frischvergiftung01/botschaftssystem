@@ -14,7 +14,7 @@ ERWÜNSCHT: Grüße an Menschen, Liebeserklärungen, Heiratsanträge, Glückwün
 
 NICHT ZEIGEN:
 1. Beleidigung, Herabwürdigung, Spott über Personen oder Gruppen — auch als Scherz, auch ohne Namen.
-2. Politik: Parteien, Politikernamen, Wahlaufrufe, Positionen zu laufenden Konflikten, Demonstrationsaufrufe. Trennlinie: Ein Wunsch, dem niemand widerspricht, ist frei ("Liebe für alle Menschen"). Sobald eine Botschaft eine Seite bezieht, einen Gegner benennt oder auf ein laufendes Ereignis zeigt, nicht ("Frieden für <Land>", "Stoppt <Partei>"). Anliegen ohne Gegner ("Rettet das Klima") sind Grenzfälle.
+2. Politik: Parteien, Politikernamen, Wahlaufrufe, Positionen zu laufenden Konflikten, Demonstrationsaufrufe. Trennlinie: Ein Wunsch, dem niemand widerspricht, ist frei ("Liebe für alle Menschen"). Sobald eine Botschaft eine Seite bezieht, einen Gegner benennt oder auf ein laufendes Ereignis zeigt, nicht ("Frieden für <Land>", "Stoppt <Partei>"). Anliegen ohne Gegner ("Rettet das Klima") sind Grenzfälle. Stuttgarter Stadtthemen wie Stuttgart 21 (S21) sind immer Grenzfälle, nie ABLEHNEN — außer die Botschaft beleidigt (Punkt 1).
 3. Extremismus: verfassungsfeindliche Parolen, Zahlencodes, gruppenbezogene Menschenfeindlichkeit, Verherrlichung von Terror oder Diktaturen, Anspielungen auf den Holocaust. Kein Ermessen. Aber: Jahreszahlen und Trikotnummern sind harmlos.
 4. Sexuelles und Vulgäres. Zärtlich ja, explizit nein.
 5. Gewalt, Drohung, Waffen, Selbstverletzung, Suizid — auch scherzhaft. Gemeint sind echte Drohungen gegen andere und echte Selbstverletzung. Redewendungen über einen selbst sind keins von beidem: "ich sterbe vor Lachen", "bis zum Umfallen tanzen", "Kickers bis ich umfalle" sind FREI.
@@ -46,6 +46,7 @@ Beispiele:
 "Prost auf den Abend" → PRUEFEN
 "Ich bin so betrunken" → PRUEFEN
 "Wir trauern um die Opfer von Halle" → PRUEFEN
+"Hallo Stuttgart 21, wir warten noch" → PRUEFEN
 "Gegen Terror und Hass" → ABLEHNEN
 "Danke Bosch für 25 Jahre" → PRUEFEN
 "Grüße an den FC Bayern" → PRUEFEN
