@@ -29,6 +29,31 @@ const senden = (text, geraet) => fastify.inject({ method: 'POST', url: '/api/bot
   const anderes = await senden('Von einem anderen Gerät', 'geraet-b');
   assert.strictEqual(anderes.statusCode, 200, 'Die Sperre gilt je Gerät, nicht für alle');
 
+  // Nach Ablauf der 120 s: solange die letzte noch nicht auf der Fassade war,
+  // geht trotzdem keine neue (Entscheidung 04.11.2026).
+  const { db } = require('../src/db');
+  const vorZweiMin = Date.now() - 130 * 1000;
+  db.prepare('UPDATE botschaften SET erstellt_am = ? WHERE geraet = (SELECT geraet FROM botschaften WHERE id = ?)')
+    .run(vorZweiMin, erste.json().id);
+  const wartend = await senden('Und noch eine', 'geraet-a');
+  assert.strictEqual(wartend.statusCode, 429, 'Solange die letzte nicht lief, geht keine neue');
+  assert.strictEqual(wartend.json().wartenAufAuftritt, true, 'Die Seite muss wissen, worauf gewartet wird');
+  const st1 = (await fastify.inject({ method: 'GET', url: '/api/status/' + erste.json().token })).json();
+  assert.strictEqual(st1.naechsteMoeglich, false, 'Die Statusseite muss es auch wissen');
+
+  db.prepare('UPDATE botschaften SET anzahl_anzeigen = 1 WHERE id = ?').run(erste.json().id);
+  const st2 = (await fastify.inject({ method: 'GET', url: '/api/status/' + erste.json().token })).json();
+  assert.strictEqual(st2.naechsteMoeglich, true);
+  const danach = await senden('Jetzt aber', 'geraet-a');
+  assert.strictEqual(danach.statusCode, 200, 'Nachdem sie lief, geht die nächste');
+
+  // Obergrenze: eine zurueckgestellte sperrt nicht ewig.
+  const z = await senden('Wird zurückgestellt', 'geraet-z');
+  db.prepare("UPDATE botschaften SET status = 'zurueckgestellt', erstellt_am = ? WHERE id = ?")
+    .run(Date.now() - 16 * 60 * 1000, z.json().id);
+  const nachObergrenze = await senden('Nach der Obergrenze', 'geraet-z');
+  assert.strictEqual(nachObergrenze.statusCode, 200, 'Nach 15 Minuten geht die nächste auch ohne Auftritt');
+
   // Vom Moderationsplatz (angemeldet) gilt keine Sperre — sonst wäre die
   // Testseite unbrauchbar und am Abend könnte niemand vom Haus aus einstellen.
   const an = await fastify.inject({ method: 'POST', url: '/api/moderation/anmelden', payload: { kennwort: 'probe-kennwort-2026' } });

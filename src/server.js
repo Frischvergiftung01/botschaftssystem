@@ -100,6 +100,14 @@ fastify.post('/api/botschaft', async (req, reply) => {
     const wart = Math.ceil((cfg.sperreProGeraetSekunden * 1000 - (Date.now() - letzte.erstellt_am)) / 1000);
     return reply.code(429).send({ fehler: `Kurz durchatmen — in ${wart} Sekunden geht die nächste.`, wartenSekunden: wart });
   }
+  // Und solange die letzte noch nicht an der Fassade war: erst die eine sehen,
+  // dann die naechste schicken. Mit Obergrenze, falls sie zurueckgestellt wurde.
+  if (letzte && wartetNochAufAuftritt(letzte)) {
+    return reply.code(429).send({
+      fehler: 'Deine letzte Botschaft war noch nicht auf der Fassade. Sobald sie lief, kannst du die nächste schicken.',
+      wartenAufAuftritt: true
+    });
+  }
 
   const token = crypto.randomBytes(9).toString('base64url');
   const jetzt = Date.now();
@@ -177,6 +185,8 @@ fastify.get('/api/status/:token', async (req, reply) => {
     text: b.text,
     name: b.name,
     anzahlAnzeigen: b.anzahl_anzeigen,
+    // Darf von diesem Geraet schon die naechste kommen? Erst, wenn diese lief.
+    naechsteMoeglich: !wartetNochAufAuftritt(b),
     vorDir: b.anzahl_anzeigen > 0 ? 0 : naechste,
     // Schätzung für alles, was noch nicht gebucht ist. Sie rechnet mit den
     // Flächen, auf die dieser Text lesbar passt — eine lange Botschaft kommt
@@ -199,6 +209,13 @@ fastify.get('/api/status/:token', async (req, reply) => {
 });
 
 function vollerText (b) { return b.name ? `${b.text} — ${b.name}` : b.text; }
+
+/** Wartet diese Botschaft noch auf ihren ersten Auftritt (innerhalb der Obergrenze)? */
+function wartetNochAufAuftritt (b, jetzt = Date.now()) {
+  if (!['neu', 'freigegeben', 'zurueckgestellt'].includes(b.status)) return false;
+  if ((b.anzahl_anzeigen || 0) > 0) return false;
+  return jetzt - b.erstellt_am < cfg.sperreBisAuftrittMinuten * 60 * 1000;
+}
 
 // ---------------------------------------------------------------- Anzeige und Flächen
 

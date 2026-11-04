@@ -31,6 +31,8 @@ services:
       # Fruehester erster Auftritt nach der Freigabe, damit der Absender
       # rechtzeitig am angesagten Ort steht.
       VORLAUF_SEKUNDEN: ${VORLAUF_SEKUNDEN:-60}
+      # Naechste Botschaft erst, wenn die letzte auf der Fassade war; hoechstens so lange.
+      SPERRE_BIS_AUFTRITT_MINUTEN: ${SPERRE_BIS_AUFTRITT_MINUTEN:-15}
       # Stufe 1b. Der Schluessel steht in Coolify unter Environment Variables
       # und niemals hier - diese Datei liegt im Repository.
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}

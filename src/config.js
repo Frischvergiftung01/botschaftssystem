@@ -87,6 +87,11 @@ module.exports = {
   // steht, ist sie schon wieder weg. (Entscheidung 04.11.2026)
   vorlaufSekunden: Number(process.env.VORLAUF_SEKUNDEN || 60),
 
+  // Die naechste Botschaft vom selben Geraet geht erst, wenn die letzte einmal
+  // an der Fassade war (oder abgelehnt ist) — hoechstens aber so viele Minuten
+  // lang, damit eine zurueckgestellte niemanden ewig aussperrt. (04.11.2026)
+  sperreBisAuftrittMinuten: Number(process.env.SPERRE_BIS_AUFTRITT_MINUTEN || 15),
+
   // Puls der Bridge. Leer = der Endpunkt nimmt jeden Puls an; gesetzt = die
   // Bridge muss denselben Wert in ihrer einstellungen.json stehen haben.
   bridgeToken: (process.env.BRIDGE_TOKEN || '').trim(),

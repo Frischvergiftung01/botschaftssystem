@@ -8,6 +8,9 @@
 <style>
   :root{--grund:#0d0f14;--feld:#171b23;--rand:#2a3040;--text:#f2f4f8;--leise:#98a1b3;--gold:#ffcf6b;--gruen:#7ee0a8}
   *{box-sizing:border-box}
+  [hidden]{display:none!important}   /* sonst schlaegt a.knopf{display:block} das hidden */
+  .resonanz{margin-top:14px}
+  .resonanz a{color:var(--leise);font-weight:600;letter-spacing:.03em;text-decoration:none}
   html,body{margin:0;background:var(--grund);color:var(--text);
     font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   body{min-height:100dvh;display:flex;flex-direction:column;align-items:center;gap:18px;
@@ -97,11 +100,15 @@
   <div class="balken"><div id="balken"></div></div>
 </div>
 
-<a class="knopf" id="weiter" href="/">Noch eine Botschaft schicken</a>
+<a class="knopf" id="weiter" href="/" hidden>Noch eine Botschaft schicken</a>
 <p class="fuss">Du kannst die Seite offen lassen — sie hält sich von selbst auf dem Laufenden.
 Wenn du sie schließt, findest du deine Botschaft über die Startseite wieder.<br>
 <a href="/datenschutz" style="color:inherit">Datenschutz</a> ·
 <a href="/impressum" style="color:inherit">Impressum</a></p>
+<p class="fuss resonanz" id="resonanz" hidden>
+  <a href="https://www.frischvergiftung.de/resonanz" target="_blank" rel="noopener">RESONANZ by Frischvergiftung</a><br>
+  Das smarte Botschaftssystem für Events
+</p>
 
 <script>
 const token = new URLSearchParams(location.search).get('t') || localStorage.getItem('token');
@@ -118,10 +125,13 @@ if (token && !eigene().some(x => x.token === token)) {
   localStorage.setItem(LISTE, JSON.stringify(liste.slice(0, 10)));
 }
 
-// "Noch eine Botschaft" bleibt zu, solange die Gerätesperre läuft — sonst
-// tippt jemand einen Text und bekommt erst beim Abschicken die Absage.
+// "Noch eine Botschaft" erscheint erst, wenn diese einmal auf der Fassade war
+// (oder abgelehnt ist) — waehrend des Wartens soll niemand nachlegen. Danach
+// bleibt der Knopf zu, solange die Geraetesperre laeuft.
 const weiter = el('weiter');
+let naechsteMoeglich = false;
 function sperreTicken () {
+  weiter.hidden = !naechsteMoeglich;
   const rest = Math.ceil((Number(localStorage.getItem(SPERRE) || 0) - Date.now()) / 1000);
   if (rest > 0) {
     weiter.classList.add('aus');
@@ -195,6 +205,10 @@ function dauer (sekunden) {
 }
 
 function zeichnen (d) {
+  naechsteMoeglich = d.naechsteMoeglich !== false;
+  sperreTicken();
+  // Der Link zu uns erst, wenn die Botschaft da war — vorher soll niemand wegklicken.
+  el('resonanz').hidden = !(d.jetztAuf || d.anzahlAnzeigen > 0);
   el('botschaft').textContent = d.text;
   const liste = eigene();
   const eintrag = liste.find(x => x.token === token);
@@ -228,7 +242,10 @@ function zeichnen (d) {
       el('erklaerung').textContent = 'Jeden Moment — schau schon mal hin.';
       return planen(2000);
     }
-    el('ueberschrift').textContent = 'In ' + dauer(d.gebucht.inSekunden);
+    // Auf volle 10 Sekunden abgerundet: die Seite fragt nur alle paar Sekunden
+    // nach, ein sekundengenauer Wert springt dann krumm.
+    el('ueberschrift').textContent = 'Deine Botschaft erscheint in ca. '
+      + dauer(Math.floor(d.gebucht.inSekunden / 10) * 10) + ' Min.';
     el('kernaussage').textContent = d.gebucht.ort;
     el('erklaerung').textContent = d.gebucht.inSekunden <= 180
       ? 'Genug Zeit, um hinzugehen. Die Seite meldet sich, wenn es so weit ist.'
