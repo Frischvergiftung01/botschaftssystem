@@ -19,15 +19,16 @@
   h1{font-size:1.5rem;line-height:1.25;margin:0 0 6px;font-weight:650}
   .unterzeile{color:var(--leise);font-size:.95rem;margin:0}
   form{width:100%;max-width:520px;display:flex;flex-direction:column;gap:14px}
-  label{font-size:.9rem;color:var(--leise);display:block;margin-bottom:6px}
+  label{font-size:.9rem;color:var(--leise);display:block;margin-bottom:6px;text-align:center}
   label .neben{opacity:.75}
+  label[for="text"]{color:var(--text);font-weight:700}
   textarea,input{width:100%;background:var(--feld);color:var(--text);border:1px solid var(--rand);
     border-radius:14px;padding:14px;font:inherit;font-size:1.05rem;resize:none}
   textarea:focus,input:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:transparent}
   /* Ohne Kasten, wie die Unterzeile — das Eingabefeld soll das einzige Feld sein. */
   .spielregeln{font-size:.88rem;line-height:1.5;color:var(--leise);text-align:center}
   .spielregeln b{color:var(--text);font-weight:600}
-  .zaehler{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  .zaehler{display:flex;justify-content:center;align-items:baseline;gap:12px;
     font-size:.85rem;color:var(--leise);margin-top:8px}
   .zaehler .zahl{font-variant-numeric:tabular-nums;white-space:nowrap}
   .zaehler.eng #passt{color:var(--warn)}
