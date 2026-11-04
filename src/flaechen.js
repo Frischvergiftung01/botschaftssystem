@@ -49,9 +49,12 @@ saeulen(27, 'Rechts', 7, 5960, [6013, 6231, 6447, 6669, 6883, 7105, 7325]);
  *   rechts: spiegelbildlich zu links
  */
 const ZONEN = {
-  links:  { name: 'linker Teil',  beschreibung: 'linker Flügel bis linkes Portal' },
-  mitte:  { name: 'Mitte',        beschreibung: 'mittlere Kolonnade und Stirn über dem Mitteleingang' },
-  rechts: { name: 'rechter Teil', beschreibung: 'rechtes Portal bis rechter Flügel' }
+  links:  { name: 'linker Teil',  imSatz: 'im linken Teil des Gebäudes',
+    beschreibung: 'linker Flügel bis linkes Portal' },
+  mitte:  { name: 'Mitte',        imSatz: 'in der Mitte des Gebäudes',
+    beschreibung: 'mittlere Kolonnade und über dem Mitteleingang' },
+  rechts: { name: 'rechter Teil', imSatz: 'im rechten Teil des Gebäudes',
+    beschreibung: 'rechtes Portal bis rechter Flügel' }
 };
 const ZONE_JE_NR = { 1: 'mitte', 2: 'links', 3: 'rechts', 4: 'links', 5: 'rechts',
   6: 'links', 7: 'links', 8: 'rechts', 9: 'rechts' };

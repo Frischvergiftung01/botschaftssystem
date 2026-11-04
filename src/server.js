@@ -20,7 +20,7 @@ const fastify = require('fastify')({
   }
 });
 const cfg = require('./config');
-const { FLAECHEN, BANDHOEHE, ortsangabe, einrichtungName } = require('./flaechen');
+const { FLAECHEN, BANDHOEHE, ZONEN, ortsangabe, einrichtungName } = require('./flaechen');
 const { abfragen } = require('./db');
 const { groesseFuer, passendeFlaechen } = require('./text');
 const filter = require('./filter');
@@ -181,9 +181,13 @@ fastify.get('/api/status/:token', async (req, reply) => {
     // Schätzung für alles, was noch nicht gebucht ist. Sie rechnet mit den
     // Flächen, auf die dieser Text lesbar passt — eine lange Botschaft kommt
     // seltener dran, und das soll die Auskunft nicht verschweigen.
+    // Nie kuerzer als der Rest des Mindestvorlaufs.
     geschaetzteWartezeitSekunden: b.anzahl_anzeigen > 0 ? 0
-      : Math.round((naechste / Math.max(1, passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length))
-        * einstellungen.standzeit()),
+      : Math.max(
+        Math.round((naechste / Math.max(1, passendeFlaechen(vollerText(b), FLAECHEN, cfg.minVersalhoehe, cfg.maxVersalhoehe).length))
+          * einstellungen.standzeit()),
+        b.status === 'freigegeben' && b.entschieden_am
+          ? Math.ceil(Math.max(0, b.entschieden_am + cfg.vorlaufSekunden * 1000 - jetzt) / 1000) : 0),
     jetztAuf: laufend ? flaecheInfo(laufend.flaeche) : null,
     gebucht,
     zuletzt: anzeigen[0] ? { ...flaecheInfo(anzeigen[0].flaeche), start: anzeigen[0].start } : null,
@@ -510,7 +514,9 @@ function flaecheInfo (nr) {
     // Für den Fassadenplan auf der Statusseite: dieselbe Lage wie im
     // Simulator, also direkt auf der Resolume-Canvas.
     fassade: f.fassade,
-    ort: o.kurz, seite: o.seite
+    ort: o.kurz, seite: o.seite,
+    // Die Zone, in der die Botschaft wiederkommt (links / mitte / rechts).
+    zone: f.zone ? { kennung: f.zone, ...ZONEN[f.zone] } : null
   };
 }
 function hash (s) { return crypto.createHash('sha256').update(s).digest('hex').slice(0, 32); }
